@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>KineticBorrow — Login</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,800;1,600&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --gold:    #C47F2B;
+      --gold-lt: #D9952E;
+      --gold-bg: #FDF3E3;
+      --green:   #2E8B57;
+      --green-bg:#EAF6EE;
+      --red:     #C0392B;
+      --red-bg:  #FDECEA;
+      --bg:      #F7F5F2;
+      --surface: #FFFFFF;
+      --border:  #E5E0D8;
+      --border2: #D0C8BC;
+      --muted:   #8A8078;
+      --text:    #1C1916;
+      --text2:   #4A4540;
+    }
+
+    body {
+      background: var(--bg);
+      font-family: 'DM Sans', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── LEFT / RIGHT SPLIT ── */
+    .split {
+      display: flex;
+      min-height: 100vh;
+    }
+
+    /* LEFT PANEL */
+    .left-panel {
+      flex: 1;
+      background: linear-gradient(160deg, #FDF0DC 0%, #FCEBD0 40%, #F5DDB0 100%);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 60px 48px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* decorative circles */
+    .left-panel::before {
+      content: '';
+      position: absolute;
+      width: 420px; height: 420px;
+      border-radius: 50%;
+      background: rgba(196,127,43,0.1);
+      top: -100px; left: -100px;
+    }
+    .left-panel::after {
+      content: '';
+      position: absolute;
+      width: 280px; height: 280px;
+      border-radius: 50%;
+      background: rgba(196,127,43,0.08);
+      bottom: -60px; right: -60px;
+    }
+
+    .left-content { position: relative; z-index: 1; text-align: center; max-width: 380px; }
+
+    .brand {
+      display: flex; align-items: center; justify-content: center;
+      gap: 10px; margin-bottom: 40px;
+    }
+    .brand-icon { font-size: 32px; }
+    .brand-name {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 28px; font-weight: 800; letter-spacing: -0.02em; color: var(--text);
+    }
+    .brand-name span { color: var(--gold); }
+
+    .hero-emoji { font-size: 88px; margin-bottom: 24px; display: block; line-height: 1; }
+
+    .left-title {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 32px; font-weight: 800; line-height: 1.15;
+      color: var(--text); margin-bottom: 14px;
+    }
+    .left-title span { color: var(--gold); }
+
+    .left-sub {
+      font-size: 14px; color: var(--muted); line-height: 1.7; margin-bottom: 36px;
+    }
+
+    /* feature bullets */
+    .features { display: flex; flex-direction: column; gap: 12px; text-align: left; }
+    .feature-item {
+      display: flex; align-items: center; gap: 12px;
+      background: rgba(255,255,255,0.6);
+      border: 1px solid rgba(196,127,43,0.2);
+      border-radius: 10px; padding: 12px 16px;
+    }
+    .feature-icon { font-size: 20px; flex-shrink: 0; }
+    .feature-text { font-size: 13px; color: var(--text2); font-weight: 500; }
+    .feature-text span { display: block; font-size: 11px; color: var(--muted); font-weight: 400; margin-top: 1px; }
+
+    /* RIGHT PANEL */
+    .right-panel {
+      width: 460px;
+      flex-shrink: 0;
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 56px 48px;
+      box-shadow: -4px 0 30px rgba(0,0,0,0.06);
+    }
+
+    /* tabs */
+    .tab-row {
+      display: flex; gap: 0;
+      background: var(--bg); border-radius: 10px; padding: 4px;
+      margin-bottom: 32px;
+    }
+    .tab-btn {
+      flex: 1; background: none; border: none; cursor: pointer;
+      font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500;
+      padding: 10px; border-radius: 8px; color: var(--muted); transition: all 0.2s;
+    }
+    .tab-btn.active {
+      background: #fff; color: var(--text); font-weight: 600;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.08);
+    }
+
+    /* form sections */
+    .form-section { display: none; }
+    .form-section.active { display: block; }
+
+    .form-title {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 24px; font-weight: 800; color: var(--text); margin-bottom: 6px;
+    }
+    .form-sub { font-size: 13px; color: var(--muted); margin-bottom: 28px; line-height: 1.5; }
+
+    /* input groups */
+    .input-group { margin-bottom: 18px; }
+    .input-label {
+      display: block; font-size: 12px; font-weight: 600; color: var(--text2);
+      letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 7px;
+    }
+    .input-wrap { position: relative; }
+    .input-icon {
+      position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+      font-size: 15px; color: #C0B8AE; pointer-events: none;
+    }
+    .form-input {
+      width: 100%; background: var(--bg); border: 1.5px solid var(--border);
+      border-radius: 10px; padding: 11px 16px 11px 42px;
+      color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 14px;
+      outline: none; transition: all 0.2s;
+    }
+    .form-input:focus { border-color: var(--gold); background: #fff; box-shadow: 0 0 0 3px rgba(196,127,43,0.1); }
+    .form-input::placeholder { color: #C0B8AE; }
+    .form-input.error { border-color: var(--red); background: var(--red-bg); }
+
+    /* password toggle */
+    .eye-btn {
+      position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+      background: none; border: none; cursor: pointer; font-size: 16px; color: #C0B8AE;
+      transition: color 0.15s;
+    }
+    .eye-btn:hover { color: var(--gold); }
+
+    .error-msg { font-size: 11px; color: var(--red); margin-top: 5px; display: none; }
+    .error-msg.show { display: block; }
+
+    /* row for two inputs side by side */
+    .input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+    /* forgot password */
+    .forgot-row { display: flex; justify-content: flex-end; margin-top: -10px; margin-bottom: 18px; }
+    .forgot-link { font-size: 12px; color: var(--gold); text-decoration: none; font-weight: 500; cursor: pointer; }
+    .forgot-link:hover { text-decoration: underline; }
+
+    /* remember me */
+    .remember-row { display: flex; align-items: center; gap: 8px; margin-bottom: 22px; }
+    .custom-check {
+      width: 18px; height: 18px; border: 1.5px solid var(--border2); border-radius: 5px;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: all 0.15s; flex-shrink: 0; background: #fff;
+    }
+    .custom-check.checked { background: var(--gold); border-color: var(--gold); }
+    .custom-check.checked::after { content: '✓'; font-size: 11px; color: #fff; font-weight: 700; }
+    .remember-label { font-size: 13px; color: var(--text2); cursor: pointer; user-select: none; }
+
+    /* submit button */
+    .submit-btn {
+      width: 100%; background: var(--gold); color: #fff; border: none;
+      padding: 13px; border-radius: 10px; cursor: pointer;
+      font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 600;
+      transition: all 0.2s; letter-spacing: 0.02em;
+    }
+    .submit-btn:hover { background: var(--gold-lt); transform: translateY(-1px); box-shadow: 0 6px 16px rgba(196,127,43,0.3); }
+    .submit-btn:active { transform: translateY(0); }
+
+    /* loading state */
+    .submit-btn.loading { opacity: 0.7; cursor: not-allowed; pointer-events: none; }
+
+    /* divider */
+    .or-divider {
+      display: flex; align-items: center; gap: 12px;
+      margin: 20px 0; color: var(--muted); font-size: 12px;
+    }
+    .or-divider::before, .or-divider::after {
+      content: ''; flex: 1; height: 1px; background: var(--border);
+    }
+
+    /* social buttons */
+    .social-row { display: flex; gap: 10px; }
+    .social-btn {
+      flex: 1; background: var(--bg); border: 1.5px solid var(--border);
+      border-radius: 10px; padding: 10px; cursor: pointer;
+      font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
+      color: var(--text2); display: flex; align-items: center; justify-content: center; gap: 8px;
+      transition: all 0.2s;
+    }
+    .social-btn:hover { border-color: var(--gold); background: var(--gold-bg); color: var(--gold); }
+
+    /* switch link */
+    .switch-text {
+      text-align: center; font-size: 13px; color: var(--muted); margin-top: 22px;
+    }
+    .switch-link { color: var(--gold); font-weight: 600; cursor: pointer; }
+    .switch-link:hover { text-decoration: underline; }
+
+    /* ID type selector (register) */
+    .id-type-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 18px; }
+    .id-type-btn {
+      background: var(--bg); border: 1.5px solid var(--border); border-radius: 10px;
+      padding: 10px 8px; cursor: pointer; text-align: center; transition: all 0.2s;
+    }
+    .id-type-btn:hover  { border-color: var(--gold); background: var(--gold-bg); }
+    .id-type-btn.active { border-color: var(--gold); background: var(--gold-bg); }
+    .id-type-btn .id-emoji { font-size: 20px; margin-bottom: 3px; }
+    .id-type-btn .id-label { font-size: 11px; font-weight: 600; color: var(--text2); }
+    .id-type-btn.active .id-label { color: var(--gold); }
+
+    /* success screen */
+    .success-screen {
+      display: none; text-align: center; padding: 20px 0;
+    }
+    .success-screen.show { display: block; }
+    .success-icon { font-size: 56px; margin-bottom: 16px; }
+    .success-title {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 22px; font-weight: 800; color: var(--text); margin-bottom: 8px;
+    }
+    .success-sub { font-size: 13px; color: var(--muted); line-height: 1.6; margin-bottom: 24px; }
+
+    /* progress bar for password strength */
+    .strength-row { margin-top: 6px; display: none; }
+    .strength-row.show { display: block; }
+    .strength-bar-bg { height: 4px; background: var(--border); border-radius: 4px; overflow: hidden; }
+    .strength-bar { height: 100%; border-radius: 4px; transition: all 0.3s; }
+    .strength-label { font-size: 11px; margin-top: 4px; }
+
+    /* terms */
+    .terms-row { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 20px; }
+    .terms-text { font-size: 12px; color: var(--muted); line-height: 1.5; }
+    .terms-text a { color: var(--gold); font-weight: 500; text-decoration: none; cursor: pointer; }
+    .terms-text a:hover { text-decoration: underline; }
+
+    /* footer */
+    .right-footer { margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--border); text-align: center; }
+    .right-footer p { font-size: 11px; color: #C0B8AE; }
+
+    /* toast */
+    .toast {
+      position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(80px);
+      background: var(--text); color: #fff; padding: 12px 22px; border-radius: 10px;
+      font-size: 13px; font-weight: 500; z-index: 999;
+      transition: transform 0.3s ease; white-space: nowrap;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+    .toast.success-toast { background: var(--green); }
+
+    /* scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<div class="split">
+
+  <!-- ════════ LEFT PANEL ════════ -->
+  <div class="left-panel">
+    <div class="left-content">
+      <div class="brand">
+        <span class="brand-icon">🏋️</span>
+        <span class="brand-name">Kinetic<span>Borrow</span></span>
+      </div>
+
+      <span class="hero-emoji">🏆</span>
+
+      <h1 class="left-title">Rent. Play.<br><span>Return. Repeat.</span></h1>
+      <p class="left-sub">Your one-stop platform for renting premium sports equipment. Explore gear, book in minutes, and hit the field.</p>
+
+      <div class="features">
+        <div class="feature-item">
+          <span class="feature-icon">🚵</span>
+          <div class="feature-text">
+            Wide Equipment Selection
+            <span>Bikes, rackets, kayaks, and more</span>
+          </div>
+        </div>
+        <div class="feature-item">
+          <span class="feature-icon">🪪</span>
+          <div class="feature-text">
+            AI-Powered ID Discounts
+            <span>Student, Senior, and PWD rates auto-applied</span>
+          </div>
+        </div>
+        <div class="feature-item">
+          <span class="feature-icon">⭐</span>
+          <div class="feature-text">
+            Loyalty Rewards Program
+            <span>Earn points on every rental</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════ RIGHT PANEL ════════ -->
+  <div class="right-panel">
+
+    <!-- TABS -->
+    <div class="tab-row">
+      <button class="tab-btn active" id="tab-login" onclick="switchTab('login')">Log In</button>
+      <button class="tab-btn" id="tab-register" onclick="switchTab('register')">Create Account</button>
+    </div>
+
+    <!-- ── LOGIN FORM ── -->
+    <div class="form-section active" id="section-login">
+      <div id="login-form-wrap">
+        <h2 class="form-title">Welcome back!</h2>
+        <p class="form-sub">Log in to your KineticBorrow account to manage your rentals.</p>
+
+        <div class="input-group">
+          <label class="input-label">Email Address</label>
+          <div class="input-wrap">
+            <span class="input-icon">✉️</span>
+            <input class="form-input" id="login-email" type="email" placeholder="you@email.com" oninput="clearError('login-email-err')"/>
+          </div>
+          <p class="error-msg" id="login-email-err">Please enter a valid email address.</p>
+        </div>
+
+        <div class="input-group">
+          <label class="input-label">Password</label>
+          <div class="input-wrap">
+            <span class="input-icon">🔒</span>
+            <input class="form-input" id="login-pass" type="password" placeholder="Enter your password" oninput="clearError('login-pass-err')"/>
+            <button class="eye-btn" onclick="togglePass('login-pass', this)" type="button">👁️</button>
+          </div>
+          <p class="error-msg" id="login-pass-err">Password is required.</p>
+        </div>
+
+        <div class="forgot-row">
+          <a class="forgot-link" onclick="showToast('Password reset link sent to your email!', false)">Forgot password?</a>
+        </div>
+
+        <div class="remember-row">
+          <div class="custom-check" id="remember-check" onclick="toggleCheck('remember-check')"></div>
+          <span class="remember-label" onclick="toggleCheck('remember-check')">Remember me for 30 days</span>
+        </div>
+
+        <button class="submit-btn" onclick="handleLogin()">Log In →</button>
+
+        <div class="or-divider">or continue with</div>
+        <div class="social-row">
+          <button class="social-btn" onclick="showToast('Google login coming soon!', false)">
+            <span>🌐</span> Google
+          </button>
+          <button class="social-btn" onclick="showToast('Facebook login coming soon!', false)">
+            <span>📘</span> Facebook
+          </button>
+        </div>
+
+        <p class="switch-text">
+          New here? <span class="switch-link" onclick="switchTab('register')">Create a free account</span>
+        </p>
+      </div>
+
+      <!-- Login Success -->
+      <div class="success-screen" id="login-success">
+        <div class="success-icon">🎉</div>
+        <h2 class="success-title">Welcome back, Harold!</h2>
+        <p class="success-sub">You're logged in successfully. Redirecting you to your dashboard in a moment...</p>
+        <button class="submit-btn" onclick="window.location.href='kineticborrow-ui.html'">Go to Dashboard →</button>
+      </div>
+    </div>
+
+    <!-- ── REGISTER FORM ── -->
+    <div class="form-section" id="section-register">
+      <div id="register-form-wrap">
+        <h2 class="form-title">Join KineticBorrow</h2>
+        <p class="form-sub">Create your account and start renting sports equipment today.</p>
+
+        <div class="input-row">
+          <div class="input-group">
+            <label class="input-label">First Name</label>
+            <div class="input-wrap">
+              <span class="input-icon">👤</span>
+              <input class="form-input" id="reg-fname" type="text" placeholder="Juan" oninput="clearError('reg-fname-err')"/>
+            </div>
+            <p class="error-msg" id="reg-fname-err">Required.</p>
+          </div>
+          <div class="input-group">
+            <label class="input-label">Last Name</label>
+            <div class="input-wrap">
+              <span class="input-icon">👤</span>
+              <input class="form-input" id="reg-lname" type="text" placeholder="Dela Cruz" oninput="clearError('reg-lname-err')"/>
+            </div>
+            <p class="error-msg" id="reg-lname-err">Required.</p>
+          </div>
+        </div>
+
+        <div class="input-group">
+          <label class="input-label">Email Address</label>
+          <div class="input-wrap">
+            <span class="input-icon">✉️</span>
+            <input class="form-input" id="reg-email" type="email" placeholder="you@email.com" oninput="clearError('reg-email-err')"/>
+          </div>
+          <p class="error-msg" id="reg-email-err">Please enter a valid email.</p>
+        </div>
+
+        <div class="input-group">
+          <label class="input-label">Phone Number</label>
+          <div class="input-wrap">
+            <span class="input-icon">📱</span>
+            <input class="form-input" id="reg-phone" type="tel" placeholder="09XX XXX XXXX" oninput="clearError('reg-phone-err')"/>
+          </div>
+          <p class="error-msg" id="reg-phone-err">Please enter a valid phone number.</p>
+        </div>
+
+        <div class="input-group">
+          <label class="input-label">Password</label>
+          <div class="input-wrap">
+            <span class="input-icon">🔒</span>
+            <input class="form-input" id="reg-pass" type="password" placeholder="Create a strong password" oninput="checkStrength(); clearError('reg-pass-err')"/>
+            <button class="eye-btn" onclick="togglePass('reg-pass', this)" type="button">👁️</button>
+          </div>
+          <div class="strength-row" id="strength-row">
+            <div class="strength-bar-bg"><div class="strength-bar" id="strength-bar"></div></div>
+            <p class="strength-label" id="strength-label"></p>
+          </div>
+          <p class="error-msg" id="reg-pass-err">Password must be at least 6 characters.</p>
+        </div>
+
+        <div class="input-group" style="margin-bottom:12px">
+          <label class="input-label">ID Type (Optional — for discount)</label>
+          <div class="id-type-grid">
+            <div class="id-type-btn" onclick="selectID(this,'student')">
+              <div class="id-emoji">🎓</div>
+              <div class="id-label">Student ID</div>
+            </div>
+            <div class="id-type-btn" onclick="selectID(this,'senior')">
+              <div class="id-emoji">👴</div>
+              <div class="id-label">Senior Citizen</div>
+            </div>
+            <div class="id-type-btn" onclick="selectID(this,'pwd')">
+              <div class="id-emoji">♿</div>
+              <div class="id-label">PWD ID</div>
+            </div>
+            <div class="id-type-btn" onclick="selectID(this,'none')">
+              <div class="id-emoji">🪪</div>
+              <div class="id-label">Regular / None</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="terms-row">
+          <div class="custom-check" id="terms-check" onclick="toggleCheck('terms-check')"></div>
+          <p class="terms-text">
+            I agree to the <a onclick="showToast('Terms of Service opened.', false)">Terms of Service</a>
+            and <a onclick="showToast('Privacy Policy opened.', false)">Privacy Policy</a> of KineticBorrow.
+          </p>
+        </div>
+        <p class="error-msg" id="terms-err" style="margin-top:-12px;margin-bottom:14px">Please accept the terms to continue.</p>
+
+        <button class="submit-btn" onclick="handleRegister()">Create Account →</button>
+
+        <p class="switch-text">
+          Already have an account? <span class="switch-link" onclick="switchTab('login')">Log in here</span>
+        </p>
+      </div>
+
+      <!-- Register Success -->
+      <div class="success-screen" id="register-success">
+        <div class="success-icon">✅</div>
+        <h2 class="success-title">Account Created!</h2>
+        <p class="success-sub">Welcome to KineticBorrow! Your account is ready. Log in to start browsing equipment.</p>
+        <button class="submit-btn" onclick="switchTab('login'); hideSuccess()">Go to Log In →</button>
+      </div>
+    </div>
+
+    <div class="right-footer">
+      <p>© 2026 KineticBorrow · University of Caloocan City</p>
+    </div>
+
+  </div><!-- /right-panel -->
+</div><!-- /split -->
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+  // ── Tab switching ────────────────────────────────────────────────
+  function switchTab(tab) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.form-section').forEach(s => s.classList.remove('active'));
+    document.getElementById('tab-' + tab).classList.add('active');
+    document.getElementById('section-' + tab).classList.add('active');
+  }
+
+  // ── Toggle password visibility ───────────────────────────────────
+  function togglePass(id, btn) {
+    const input = document.getElementById(id);
+    if (input.type === 'password') { input.type = 'text';     btn.textContent = '🙈'; }
+    else                           { input.type = 'password'; btn.textContent = '👁️'; }
+  }
+
+  // ── Checkbox toggle ──────────────────────────────────────────────
+  function toggleCheck(id) {
+    const el = document.getElementById(id);
+    el.classList.toggle('checked');
+    if (id === 'terms-check') clearError('terms-err');
+  }
+
+  // ── Clear error ──────────────────────────────────────────────────
+  function clearError(id) {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('show');
+    // also remove error style from sibling input
+    const input = el ? el.previousElementSibling : null;
+    if (input && input.classList) input.classList.remove('error');
+  }
+
+  function showError(errId, inputEl) {
+    const el = document.getElementById(errId);
+    if (el) el.classList.add('show');
+    if (inputEl) inputEl.classList.add('error');
+  }
+
+  // ── Password strength ────────────────────────────────────────────
+  function checkStrength() {
+    const val = document.getElementById('reg-pass').value;
+    const row  = document.getElementById('strength-row');
+    const bar  = document.getElementById('strength-bar');
+    const lbl  = document.getElementById('strength-label');
+    if (!val) { row.classList.remove('show'); return; }
+    row.classList.add('show');
+    let score = 0;
+    if (val.length >= 6)  score++;
+    if (val.length >= 10) score++;
+    if (/[A-Z]/.test(val)) score++;
+    if (/[0-9]/.test(val)) score++;
+    if (/[^A-Za-z0-9]/.test(val)) score++;
+    const levels = [
+      { w: '20%',  color: '#E05252', label: '😬 Too weak' },
+      { w: '40%',  color: '#E07C35', label: '🤔 Weak' },
+      { w: '60%',  color: '#D6A252', label: '😐 Fair' },
+      { w: '80%',  color: '#7EC87A', label: '😊 Good' },
+      { w: '100%', color: '#2E8B57', label: '💪 Strong' },
+    ];
+    const lvl = levels[Math.min(score - 1, 4)] || levels[0];
+    bar.style.width = lvl.w;
+    bar.style.background = lvl.color;
+    lbl.textContent = lvl.label;
+    lbl.style.color = lvl.color;
+  }
+
+  // ── ID type selector ─────────────────────────────────────────────
+  function selectID(el, type) {
+    document.querySelectorAll('.id-type-btn').forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+  }
+
+  // ── Login handler ────────────────────────────────────────────────
+  function handleLogin() {
+    const email = document.getElementById('login-email');
+    const pass  = document.getElementById('login-pass');
+    let valid = true;
+
+    if (!email.value || !/\S+@\S+\.\S+/.test(email.value)) {
+      showError('login-email-err', email); valid = false;
+    }
+    if (!pass.value) {
+      showError('login-pass-err', pass); valid = false;
+    }
+    if (!valid) return;
+
+    const btn = document.querySelector('#section-login .submit-btn');
+    btn.textContent = 'Logging in...';
+    btn.classList.add('loading');
+
+    setTimeout(() => {
+      btn.classList.remove('loading');
+      btn.textContent = 'Log In →';
+      document.getElementById('login-form-wrap').style.display = 'none';
+      document.getElementById('login-success').classList.add('show');
+      // auto redirect after 1.5s
+      setTimeout(() => { window.location.href = 'kineticborrow-ui.html'; }, 1500);
+    }, 1400);
+  }
+
+  // ── Register handler ─────────────────────────────────────────────
+  function handleRegister() {
+    const fname = document.getElementById('reg-fname');
+    const lname = document.getElementById('reg-lname');
+    const email = document.getElementById('reg-email');
+    const phone = document.getElementById('reg-phone');
+    const pass  = document.getElementById('reg-pass');
+    const terms = document.getElementById('terms-check');
+    let valid = true;
+
+    if (!fname.value.trim()) { showError('reg-fname-err', fname); valid = false; }
+    if (!lname.value.trim()) { showError('reg-lname-err', lname); valid = false; }
+    if (!email.value || !/\S+@\S+\.\S+/.test(email.value)) { showError('reg-email-err', email); valid = false; }
+    if (!phone.value.trim()) { showError('reg-phone-err', phone); valid = false; }
+    if (pass.value.length < 6) { showError('reg-pass-err', pass); valid = false; }
+    if (!terms.classList.contains('checked')) { document.getElementById('terms-err').classList.add('show'); valid = false; }
+    if (!valid) return;
+
+    const btn = document.querySelector('#section-register .submit-btn');
+    btn.textContent = 'Creating account...';
+    btn.classList.add('loading');
+
+    setTimeout(() => {
+      btn.classList.remove('loading');
+      btn.textContent = 'Create Account →';
+      document.getElementById('register-form-wrap').style.display = 'none';
+      document.getElementById('register-success').classList.add('show');
+    }, 1600);
+  }
+
+  function hideSuccess() {
+    document.getElementById('register-form-wrap').style.display = 'block';
+    document.getElementById('register-success').classList.remove('show');
+  }
+
+  // ── Toast ────────────────────────────────────────────────────────
+  function showToast(msg, success) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast' + (success ? ' success-toast' : '') + ' show';
+    setTimeout(() => t.classList.remove('show'), 2800);
+  }
+</script>
+</body>
+</html>

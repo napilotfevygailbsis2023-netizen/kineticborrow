@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>KineticBorrow — Borrower UI</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,800;1,600&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --gold:     #C47F2B;
+      --gold-lt:  #D9952E;
+      --gold-bg:  #FDF3E3;
+      --green:    #2E8B57;
+      --green-bg: #EAF6EE;
+      --red:      #C0392B;
+      --red-bg:   #FDECEA;
+      --blue:     #2563EB;
+      --blue-bg:  #EEF3FD;
+      --bg:       #F7F5F2;
+      --surface:  #FFFFFF;
+      --border:   #E5E0D8;
+      --border2:  #D0C8BC;
+      --muted:    #8A8078;
+      --text:     #1C1916;
+      --text2:    #4A4540;
+      --display:  'Playfair Display', Georgia, serif;
+      --body:     'DM Sans', sans-serif;
+    }
+
+    body { background: var(--bg); color: var(--text); font-family: var(--body); min-height: 100vh; }
+
+    nav {
+      background: #fff; border-bottom: 1px solid var(--border);
+      padding: 0 32px; display: flex; align-items: center; justify-content: space-between;
+      height: 62px; position: sticky; top: 0; z-index: 100;
+      box-shadow: 0 1px 8px rgba(0,0,0,0.06);
+    }
+    .brand { display: flex; align-items: center; gap: 10px; }
+    .brand-name { font-family: var(--display); font-size: 20px; font-weight: 800; letter-spacing: -0.02em; color: var(--text); }
+    .brand-name span { color: var(--gold); }
+    .nav-links { display: flex; gap: 4px; }
+    .nav-btn {
+      background: none; border: none; cursor: pointer; font-family: var(--body);
+      font-size: 13px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase;
+      padding: 8px 16px; border-radius: 6px; color: var(--text2); transition: all 0.2s;
+    }
+    .nav-btn:hover  { background: var(--gold-bg); color: var(--gold); }
+    .nav-btn.active { background: var(--gold-bg); color: var(--gold); font-weight: 600; }
+    .cart-badge { background: var(--gold); color: #fff; border-radius: 10px; padding: 1px 7px; font-size: 10px; font-weight: 700; margin-left: 4px; }
+    .avatar { width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(135deg, var(--gold), #8B5E1A); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #fff; }
+    .nav-user { display: flex; align-items: center; gap: 10px; }
+    .nav-user span { font-size: 13px; color: var(--muted); }
+
+    .container { max-width: 1100px; margin: 0 auto; padding: 32px 24px; }
+    .page { display: none; }
+    .page.active { display: block; }
+
+    .hero {
+      background: linear-gradient(120deg, #FDF0DC 0%, #FFF9F0 60%);
+      border: 1px solid #EDD8B0; border-radius: 18px;
+      padding: 30px 36px; margin-bottom: 28px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .hero-label { font-size: 11px; color: var(--gold); letter-spacing: 0.14em; text-transform: uppercase; margin-bottom: 6px; font-weight: 600; }
+    .hero-title { font-family: var(--display); font-size: 34px; font-weight: 800; line-height: 1.1; margin-bottom: 10px; }
+    .hero-title span { color: var(--gold); }
+    .hero-sub { font-size: 13px; color: var(--muted); max-width: 320px; line-height: 1.6; }
+    .hero-emoji { font-size: 76px; }
+
+    .filter-row { display: flex; gap: 12px; align-items: center; margin-bottom: 22px; flex-wrap: wrap; }
+    .search-wrap { position: relative; flex: 1; min-width: 200px; }
+    .search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: 14px; color: #B0A898; pointer-events: none; }
+    .search-input {
+      background: #fff; border: 1px solid var(--border); border-radius: 10px;
+      padding: 10px 16px 10px 42px; color: var(--text); outline: none; width: 100%;
+      font-family: var(--body); font-size: 14px; transition: all 0.2s;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+    }
+    .search-input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(196,127,43,0.1); }
+    .search-input::placeholder { color: #C0B8AE; }
+    .pills { display: flex; gap: 8px; flex-wrap: wrap; }
+    .pill {
+      background: #fff; border: 1px solid var(--border); border-radius: 20px;
+      padding: 6px 16px; font-family: var(--body); font-size: 12px; font-weight: 500;
+      cursor: pointer; transition: all 0.18s; color: var(--text2);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    .pill:hover  { border-color: var(--gold); color: var(--gold); background: var(--gold-bg); }
+    .pill.active { background: var(--gold); border-color: var(--gold); color: #fff; }
+
+    .eq-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 18px; }
+    .card {
+      background: #fff; border: 1px solid var(--border); border-radius: 16px;
+      overflow: hidden; transition: all 0.25s; cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    .card:hover { border-color: var(--gold); transform: translateY(-4px); box-shadow: 0 12px 32px rgba(196,127,43,0.14); }
+    .card-img { background: var(--gold-bg); padding: 28px 0; text-align: center; font-size: 52px; border-bottom: 1px solid #EDD8B0; position: relative; }
+    .stock-badge { position: absolute; top: 10px; right: 10px; background: var(--red-bg); color: var(--red); border: 1px solid #F5C6C2; font-size: 10px; padding: 2px 8px; border-radius: 4px; font-weight: 600; }
+    .card-body { padding: 16px; }
+    .tags { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
+    .tag { font-size: 10px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; padding: 3px 8px; border-radius: 4px; }
+    .tag-popular { background: var(--gold-bg);  color: var(--gold);  border: 1px solid #EDD8B0; }
+    .tag-student { background: var(--green-bg); color: var(--green); border: 1px solid #C0E0CC; }
+    .tag-limited { background: var(--red-bg);   color: var(--red);   border: 1px solid #F5C6C2; }
+    .tag-weekend { background: var(--blue-bg);  color: var(--blue);  border: 1px solid #C0D4F8; }
+    .card-name { font-family: var(--display); font-size: 17px; font-weight: 700; margin-bottom: 3px; }
+    .card-cat  { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+    .card-foot { display: flex; align-items: center; justify-content: space-between; }
+    .card-price { font-family: var(--display); font-size: 22px; color: var(--gold); font-weight: 700; }
+    .card-price span { font-family: var(--body); font-size: 12px; color: var(--muted); }
+    .card-rating { font-size: 12px; color: var(--muted); }
+
+    .gold-btn {
+      background: var(--gold); color: #fff; border: none;
+      padding: 11px 24px; border-radius: 10px; cursor: pointer;
+      font-family: var(--body); font-size: 13px; font-weight: 600;
+      transition: all 0.2s; width: 100%; margin-top: 12px;
+    }
+    .gold-btn:hover { background: var(--gold-lt); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(196,127,43,0.3); }
+    .ghost-btn {
+      background: transparent; color: var(--text2); border: 1px solid var(--border);
+      padding: 10px 22px; border-radius: 10px; cursor: pointer;
+      font-family: var(--body); font-size: 13px; font-weight: 500;
+      transition: all 0.2s; width: 100%; margin-top: 8px;
+    }
+    .ghost-btn:hover { border-color: var(--gold); color: var(--gold); background: var(--gold-bg); }
+
+    .cart-layout { display: grid; grid-template-columns: 1fr 340px; gap: 20px; align-items: start; }
+    .cart-items  { display: flex; flex-direction: column; gap: 12px; }
+    .cart-card { background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 16px 20px; display: flex; align-items: center; gap: 16px; box-shadow: 0 1px 6px rgba(0,0,0,0.04); }
+    .cart-emoji { font-size: 34px; background: var(--gold-bg); border-radius: 12px; width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .cart-info  { flex: 1; }
+    .cart-name  { font-family: var(--display); font-size: 16px; font-weight: 700; margin-bottom: 2px; }
+    .cart-rate  { font-size: 12px; color: var(--muted); }
+    .qty-row  { display: flex; align-items: center; gap: 10px; }
+    .qty-label{ font-size: 12px; color: var(--muted); }
+    .qty-ctrl { display: flex; align-items: center; gap: 6px; }
+    .qty-btn  { background: var(--bg); border: 1px solid var(--border); color: var(--text); width: 28px; height: 28px; border-radius: 7px; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+    .qty-btn:hover { background: var(--gold); border-color: var(--gold); color: #fff; }
+    .qty-val { font-size: 14px; font-weight: 600; min-width: 20px; text-align: center; }
+    .cart-subtotal { font-family: var(--display); font-size: 17px; font-weight: 700; color: var(--gold); min-width: 80px; text-align: right; }
+    .remove-btn { background: none; border: none; color: #C0B8AE; cursor: pointer; font-size: 20px; margin-left: 4px; transition: color 0.15s; }
+    .remove-btn:hover { color: var(--red); }
+
+    .id-box   { background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 20px; box-shadow: 0 1px 6px rgba(0,0,0,0.04); }
+    .id-title { font-family: var(--display); font-size: 16px; font-weight: 700; margin-bottom: 6px; }
+    .id-sub   { font-size: 12px; color: var(--muted); margin-bottom: 14px; line-height: 1.5; }
+    .upload-zone { border: 2px dashed var(--border2); border-radius: 12px; padding: 28px; text-align: center; cursor: pointer; transition: all 0.2s; background: var(--bg); }
+    .upload-zone:hover { border-color: var(--gold); background: var(--gold-bg); }
+    .upload-zone.done  { border: 2px solid var(--green); background: var(--green-bg); }
+    .upload-zone p { font-size: 13px; color: var(--muted); margin-top: 6px; }
+    .upload-zone p span { color: var(--gold); }
+    .upload-zone.done p { color: var(--green); font-weight: 500; }
+
+    .summary-box   { background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 22px; box-shadow: 0 2px 10px rgba(0,0,0,0.06); }
+    .summary-title { font-family: var(--display); font-size: 18px; font-weight: 700; margin-bottom: 18px; }
+    .summary-rows  { display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px; }
+    .summary-row   { display: flex; justify-content: space-between; font-size: 13px; }
+    .summary-row .lbl { color: var(--muted); }
+    .summary-row .val { color: var(--text); font-weight: 500; }
+    .summary-row.discount .lbl, .summary-row.discount .val { color: var(--green); }
+    .summary-divider { border-top: 1px solid var(--border); padding-top: 12px; }
+    .summary-total-lbl { font-family: var(--display); font-size: 16px; font-weight: 700; }
+    .summary-total-val { font-family: var(--display); font-size: 21px; font-weight: 800; color: var(--gold); }
+    .summary-note { font-size: 11px; color: var(--muted); text-align: center; margin-top: 14px; line-height: 1.5; }
+    .empty-cart { text-align: center; padding: 60px 0; color: var(--muted); }
+    .empty-cart .empty-icon { font-size: 48px; margin-bottom: 12px; }
+
+    .history-list { display: flex; flex-direction: column; gap: 12px; }
+    .history-card { background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 18px 22px; display: flex; align-items: center; gap: 20px; box-shadow: 0 1px 6px rgba(0,0,0,0.04); transition: box-shadow 0.2s; }
+    .history-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+    .history-card.active-order { border-left: 4px solid var(--green); border-color: #A8D8B8; }
+    .order-id-lbl { font-size: 10px; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 2px; }
+    .order-id-val { font-family: var(--display); font-size: 15px; font-weight: 700; color: var(--gold); }
+    .order-info   { flex: 1; }
+    .order-name   { font-family: var(--display); font-size: 16px; font-weight: 700; margin-bottom: 2px; }
+    .order-date   { font-size: 12px; color: var(--muted); }
+    .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+    .status-active   { background: var(--green-bg); color: var(--green); border: 1px solid #C0E0CC; }
+    .status-returned { background: #F2F0EE; color: var(--muted); border: 1px solid var(--border); }
+    .order-total { font-family: var(--display); font-size: 17px; font-weight: 700; min-width: 80px; text-align: right; }
+    .order-total.active-total { color: var(--gold); }
+    .order-total.done-total   { color: var(--muted); }
+
+    .loyalty-banner { margin-top: 22px; background: linear-gradient(120deg,#FDF0DC,#FFF9F2); border: 1px solid #EDD8B0; border-radius: 14px; padding: 22px 26px; display: flex; align-items: center; justify-content: space-between; }
+    .loyalty-lbl { font-size: 11px; color: var(--gold); text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 4px; font-weight: 600; }
+    .loyalty-pts { font-family: var(--display); font-size: 28px; font-weight: 800; }
+    .loyalty-pts span { font-size: 14px; color: var(--muted); font-weight: 400; }
+    .loyalty-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .tier-badge { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 6px 14px; font-size: 12px; color: var(--text2); display: inline-block; margin-bottom: 8px; }
+    .tier-badge span { color: var(--gold); font-weight: 600; }
+
+    .profile-wrap  { max-width: 620px; margin: 0 auto; }
+    .profile-card  { background: linear-gradient(135deg,#FDF0DC,#FFF9F2); border: 1px solid #EDD8B0; border-radius: 18px; padding: 30px; margin-bottom: 16px; text-align: center; }
+    .profile-avatar{ width: 76px; height: 76px; border-radius: 50%; background: linear-gradient(135deg,var(--gold),#8B5E1A); display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 700; color: #fff; margin: 0 auto 14px; box-shadow: 0 4px 16px rgba(196,127,43,0.3); }
+    .profile-name  { font-family: var(--display); font-size: 22px; font-weight: 800; margin-bottom: 2px; }
+    .profile-email { font-size: 13px; color: var(--muted); margin-bottom: 14px; }
+    .verified-badge{ display: inline-flex; align-items: center; gap: 6px; background: var(--green-bg); border: 1px solid #A8D8B8; border-radius: 20px; padding: 5px 16px; font-size: 12px; color: var(--green); font-weight: 500; }
+    .stats-grid    { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+    .stat-card     { background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; box-shadow: 0 1px 6px rgba(0,0,0,0.04); transition: box-shadow 0.2s; }
+    .stat-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.08); }
+    .stat-icon { font-size: 24px; margin-bottom: 6px; }
+    .stat-val  { font-family: var(--display); font-size: 22px; font-weight: 800; color: var(--gold); }
+    .stat-lbl  { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .settings-card { background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 20px 22px; box-shadow: 0 1px 6px rgba(0,0,0,0.04); }
+    .settings-title{ font-family: var(--display); font-size: 16px; font-weight: 700; margin-bottom: 16px; }
+    .settings-item { display: flex; align-items: center; justify-content: space-between; padding: 13px 0; border-bottom: 1px solid #F0EDE8; cursor: pointer; transition: padding 0.15s; }
+    .settings-item:last-child { border-bottom: none; }
+    .settings-item:hover { padding-left: 6px; }
+    .settings-item-lbl { font-size: 14px; color: var(--text2); }
+    .settings-item-lbl.danger { color: var(--red); }
+    .settings-arrow { color: #C0B8AE; font-size: 16px; }
+
+    .page-title { font-family: var(--display); font-size: 28px; font-weight: 800; margin-bottom: 6px; }
+    .page-sub   { font-size: 13px; color: var(--muted); margin-bottom: 24px; }
+
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="brand">
+    <span style="font-size:22px">🏋️</span>
+    <span class="brand-name">Kinetic<span>Borrow</span></span>
+  </div>
+  <div class="nav-links">
+    <button class="nav-btn active" onclick="showPage('browse',this)">Browse</button>
+    <button class="nav-btn" onclick="showPage('cart',this)">Cart <span class="cart-badge" id="cart-count">2</span></button>
+    <button class="nav-btn" onclick="showPage('history',this)">History</button>
+    <button class="nav-btn" onclick="showPage('profile',this)">Profile</button>
+  </div>
+  <div class="nav-user">
+    <div class="avatar">H</div>
+    <span>Harold R.</span>
+    <button onclick="window.location.href='kineticborrow-home.html'" style="background:none;border:1px solid var(--border);color:var(--muted);padding:5px 12px;border-radius:6px;cursor:pointer;font-family:var(--body);font-size:12px;margin-left:6px;transition:all 0.18s;" onmouseover="this.style.borderColor='var(--red)';this.style.color='var(--red)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">Log Out</button>
+  </div>
+</nav>
+
+<div class="container">
+
+  <!-- BROWSE -->
+  <div id="page-browse" class="page active">
+    <div class="hero">
+      <div>
+        <p class="hero-label">Sports Equipment Rental</p>
+        <h1 class="hero-title">Gear Up.<br><span>Play Hard.</span></h1>
+        <p class="hero-sub">Browse, reserve, and rent premium sports equipment — ready for pick-up at your convenience.</p>
+      </div>
+      <div class="hero-emoji">🏆</div>
+    </div>
+    <div class="filter-row">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input class="search-input" id="search-input" placeholder="Search equipment..." oninput="filterEquipment()"/>
+      </div>
+      <div class="pills">
+        <button class="pill active" onclick="filterCat(this,'All')">All</button>
+        <button class="pill" onclick="filterCat(this,'Cycling')">Cycling</button>
+        <button class="pill" onclick="filterCat(this,'Racket Sports')">Racket Sports</button>
+        <button class="pill" onclick="filterCat(this,'Water Sports')">Water Sports</button>
+        <button class="pill" onclick="filterCat(this,'Combat Sports')">Combat Sports</button>
+        <button class="pill" onclick="filterCat(this,'Team Sports')">Team Sports</button>
+      </div>
+    </div>
+    <div class="eq-grid" id="eq-grid"></div>
+  </div>
+
+  <!-- CART -->
+  <div id="page-cart" class="page">
+    <h2 class="page-title">Your Cart</h2>
+    <p class="page-sub" id="cart-subtitle">2 items reserved</p>
+    <div class="cart-layout">
+      <div>
+        <div class="cart-items" id="cart-items"></div>
+        <div class="id-box" style="margin-top:14px" id="id-box">
+          <p class="id-title">🪪 Upload ID for Discount</p>
+          <p class="id-sub">Student, Senior Citizen, or PWD ID — our AI will auto-detect your discount tier instantly.</p>
+          <div class="upload-zone" id="upload-zone" onclick="uploadID()">
+            <div style="font-size:28px;margin-bottom:6px">📎</div>
+            <p>Click to upload your ID <span>(tap to simulate AI detection)</span></p>
+          </div>
+        </div>
+      </div>
+      <div class="summary-box" id="summary-box">
+        <p class="summary-title">Order Summary</p>
+        <div class="summary-rows" id="summary-rows"></div>
+        <button class="gold-btn" onclick="alert('Booking confirmed! Your equipment is ready for pick-up.')">Confirm Booking →</button>
+        <button class="ghost-btn" onclick="showPage('browse',document.querySelectorAll('.nav-btn')[0])">Continue Browsing</button>
+        <p class="summary-note">Equipment will be prepared for pick-up once booking is confirmed.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- HISTORY -->
+  <div id="page-history" class="page">
+    <h2 class="page-title">Rental History</h2>
+    <p class="page-sub">All your past and active rentals</p>
+    <div class="history-list">
+      <div class="history-card active-order">
+        <div><p class="order-id-lbl">Order ID</p><p class="order-id-val">KB-0055</p></div>
+        <div class="order-info"><p class="order-name">Mountain Bike</p><p class="order-date">Mar 5–6, 2026</p></div>
+        <span class="status-badge status-active">🟢 Active</span>
+        <span class="order-total active-total">₱700</span>
+      </div>
+      <div class="history-card">
+        <div><p class="order-id-lbl">Order ID</p><p class="order-id-val">KB-0041</p></div>
+        <div class="order-info"><p class="order-name">Surfboard</p><p class="order-date">Feb 12–14, 2026</p></div>
+        <span class="status-badge status-returned">✓ Returned</span>
+        <span class="order-total done-total">₱1,000</span>
+      </div>
+      <div class="history-card">
+        <div><p class="order-id-lbl">Order ID</p><p class="order-id-val">KB-0038</p></div>
+        <div class="order-info"><p class="order-name">Badminton Set</p><p class="order-date">Jan 28, 2026</p></div>
+        <span class="status-badge status-returned">✓ Returned</span>
+        <span class="order-total done-total">₱120</span>
+      </div>
+    </div>
+    <div class="loyalty-banner">
+      <div>
+        <p class="loyalty-lbl">Loyalty Points</p>
+        <p class="loyalty-pts">1,820 <span>pts</span></p>
+        <p class="loyalty-sub">180 pts away from Silver tier 🥈</p>
+      </div>
+      <div style="text-align:right">
+        <div class="tier-badge">Current tier: <span>Bronze 🥉</span></div><br>
+        <button class="gold-btn" style="width:auto;padding:9px 20px;font-size:12px;margin-top:4px">Redeem Points</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PROFILE -->
+  <div id="page-profile" class="page">
+    <div class="profile-wrap">
+      <div class="profile-card">
+        <div class="profile-avatar">H</div>
+        <p class="profile-name">Harold Reyes</p>
+        <p class="profile-email"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="3f575e4d50535b114d5a465a4c7f5a525e5653115c5052">[email&#160;protected]</a></p>
+        <div class="verified-badge">✅ Student ID Verified</div>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-card"><p class="stat-icon">🏅</p><p class="stat-val">8</p><p class="stat-lbl">Total Rentals</p></div>
+        <div class="stat-card"><p class="stat-icon">⭐</p><p class="stat-val">1,820</p><p class="stat-lbl">Loyalty Points</p></div>
+        <div class="stat-card"><p class="stat-icon">📦</p><p class="stat-val">1</p><p class="stat-lbl">Active Bookings</p></div>
+        <div class="stat-card"><p class="stat-icon">💰</p><p class="stat-val">₱440</p><p class="stat-lbl">Saved (Discounts)</p></div>
+      </div>
+      <div class="settings-card">
+        <p class="settings-title">Account Settings</p>
+        <div class="settings-item"><span class="settings-item-lbl">Edit Profile</span><span class="settings-arrow">›</span></div>
+        <div class="settings-item"><span class="settings-item-lbl">Change Password</span><span class="settings-arrow">›</span></div>
+        <div class="settings-item"><span class="settings-item-lbl">Notification Preferences</span><span class="settings-arrow">›</span></div>
+        <div class="settings-item"><span class="settings-item-lbl">Manage ID Documents</span><span class="settings-arrow">›</span></div>
+        <div class="settings-item" onclick="window.location.href='kineticborrow-home.html'"><span class="settings-item-lbl danger">Log Out</span><span class="settings-arrow">›</span></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+  const EQUIPMENT = [
+    { id:1, name:"Mountain Bike",  category:"Cycling",       price:350, stock:4, rating:4.8, reviews:42, img:"🚵", tags:["Popular"] },
+    { id:2, name:"Badminton Set",  category:"Racket Sports", price:120, stock:8, rating:4.6, reviews:31, img:"🏸", tags:["Student Deal"] },
+    { id:3, name:"Surfboard",      category:"Water Sports",  price:500, stock:2, rating:4.9, reviews:18, img:"🏄", tags:["Limited"] },
+    { id:4, name:"Boxing Gloves",  category:"Combat Sports", price:180, stock:6, rating:4.5, reviews:24, img:"🥊", tags:[] },
+    { id:5, name:"Football Kit",   category:"Team Sports",   price:220, stock:5, rating:4.7, reviews:36, img:"⚽", tags:["Popular"] },
+    { id:6, name:"Kayak + Paddle", category:"Water Sports",  price:650, stock:3, rating:4.8, reviews:14, img:"🛶", tags:["Weekend Special"] },
+    { id:7, name:"Tennis Racket",  category:"Racket Sports", price:150, stock:7, rating:4.4, reviews:20, img:"🎾", tags:[] },
+    { id:8, name:"Volleyball Set", category:"Team Sports",   price:200, stock:4, rating:4.6, reviews:28, img:"🏐", tags:["Popular"] },
+  ];
+
+  let cart = [
+    { id:1, name:"Mountain Bike", days:2, price:350, img:"🚵" },
+    { id:5, name:"Football Kit",  days:1, price:220, img:"⚽" },
+  ];
+  let activeCat = "All", idUploaded = false;
+
+  function showPage(id) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('page-' + id).classList.add('active');
+    document.querySelectorAll('.nav-btn').forEach(b => {
+      if (b.textContent.trim().toLowerCase().startsWith(id)) b.classList.add('active');
+    });
+    if (id === 'cart')   renderCart();
+    if (id === 'browse') renderGrid();
+    updateCartBadge();
+  }
+
+  function renderGrid() {
+    const q = document.getElementById('search-input').value.toLowerCase();
+    const list = EQUIPMENT.filter(e => (activeCat==='All'||e.category===activeCat) && e.name.toLowerCase().includes(q));
+    document.getElementById('eq-grid').innerHTML = list.map(item => {
+      const tagHTML = item.tags.map(t => {
+        const cls = t==='Popular'?'popular': t==='Student Deal'?'student': t==='Limited'?'limited':'weekend';
+        return `<span class="tag tag-${cls}">${t}</span>`;
+      }).join('');
+      const stockBadge = item.stock<=2 ? `<span class="stock-badge">Only ${item.stock} left</span>` : '';
+      return `<div class="card">
+        <div class="card-img">${item.img}${stockBadge}</div>
+        <div class="card-body">
+          <div class="tags">${tagHTML}</div>
+          <p class="card-name">${item.name}</p>
+          <p class="card-cat">${item.category}</p>
+          <div class="card-foot">
+            <span class="card-price">₱${item.price}<span>/day</span></span>
+            <span class="card-rating">⭐ ${item.rating} (${item.reviews})</span>
+          </div>
+          <button class="gold-btn" onclick="addToCart(${item.id})">+ Add to Cart</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function filterCat(btn, cat) {
+    activeCat = cat;
+    document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    renderGrid();
+  }
+  function filterEquipment() { renderGrid(); }
+
+  function addToCart(id) {
+    const eq = EQUIPMENT.find(e => e.id===id);
+    if (!cart.find(c => c.id===id)) cart.push({ id:eq.id, name:eq.name, days:1, price:eq.price, img:eq.img });
+    updateCartBadge();
+    showPage('cart');
+  }
+
+  function renderCart() {
+    const container = document.getElementById('cart-items');
+    document.getElementById('cart-subtitle').textContent = `${cart.length} item${cart.length!==1?'s':''} reserved`;
+    if (cart.length===0) {
+      container.innerHTML = `<div class="empty-cart"><div class="empty-icon">🛒</div><p>Your cart is empty</p><button class="gold-btn" style="width:auto;padding:10px 24px;margin-top:16px" onclick="showPage('browse')">Browse Equipment</button></div>`;
+      document.getElementById('summary-box').style.display='none';
+      document.getElementById('id-box').style.display='none';
+      return;
+    }
+    document.getElementById('summary-box').style.display='block';
+    document.getElementById('id-box').style.display='block';
+    container.innerHTML = cart.map(item => `
+      <div class="cart-card">
+        <div class="cart-emoji">${item.img}</div>
+        <div class="cart-info"><p class="cart-name">${item.name}</p><p class="cart-rate">₱${item.price}/day</p></div>
+        <div class="qty-row">
+          <span class="qty-label">Days:</span>
+          <div class="qty-ctrl">
+            <button class="qty-btn" onclick="changeDays(${item.id},-1)">−</button>
+            <span class="qty-val" id="days-${item.id}">${item.days}</span>
+            <button class="qty-btn" onclick="changeDays(${item.id},1)">+</button>
+          </div>
+        </div>
+        <span class="cart-subtotal" id="sub-${item.id}">₱${item.price*item.days}</span>
+        <button class="remove-btn" onclick="removeFromCart(${item.id})">×</button>
+      </div>`).join('');
+    renderSummary();
+  }
+
+  function changeDays(id, delta) {
+    const item = cart.find(c=>c.id===id); if(!item) return;
+    item.days = Math.max(1, item.days+delta);
+    document.getElementById('days-'+id).textContent = item.days;
+    document.getElementById('sub-'+id).textContent  = '₱'+(item.price*item.days);
+    renderSummary();
+  }
+
+  function removeFromCart(id) {
+    cart = cart.filter(c=>c.id!==id);
+    updateCartBadge(); renderCart();
+  }
+
+  function renderSummary() {
+    const subtotal = cart.reduce((s,i)=>s+i.price*i.days,0);
+    const discount = idUploaded ? Math.round(subtotal*0.2) : 0;
+    const total    = subtotal - discount;
+    document.getElementById('summary-rows').innerHTML = `
+      <div class="summary-row"><span class="lbl">Subtotal</span><span class="val">₱${subtotal}</span></div>
+      ${discount?`<div class="summary-row discount"><span class="lbl">Student Discount (20%)</span><span class="val">−₱${discount}</span></div>`:''}
+      <div class="summary-row summary-divider">
+        <span class="summary-total-lbl">Total</span>
+        <span class="summary-total-val">₱${total}</span>
+      </div>`;
+  }
+
+  function uploadID() {
+    idUploaded = true;
+    const zone = document.getElementById('upload-zone');
+    zone.classList.add('done');
+    zone.innerHTML = `<div style="font-size:28px;margin-bottom:6px">✅</div><p>Student ID Detected
