@@ -14,12 +14,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($act === 'approve') {
         $conn->query("UPDATE id_verifications SET status='approved', notes='$notes', reviewed_by=$admin_id, updated_at=NOW() WHERE id=$vid");
-        $conn->query("UPDATE users SET id_verified=1 WHERE id=$uid");
-        $msg = "ID verification approved.";
+        $conn->query("UPDATE users SET id_verified=1, id_status='approved', id_reject_reason=NULL WHERE id=$uid");
+        $msg = "ID verification approved. Customer now gets 20% discount.";
     }
     if ($act === 'reject') {
         $conn->query("UPDATE id_verifications SET status='rejected', notes='$notes', reviewed_by=$admin_id, updated_at=NOW() WHERE id=$vid");
-        $conn->query("UPDATE users SET id_verified=0 WHERE id=$uid");
+        $conn->query("UPDATE users SET id_verified=0, id_status='rejected', id_reject_reason='$notes' WHERE id=$uid");
         $msg = "ID verification rejected.";
     }
     if ($act === 'escalate') {
@@ -28,7 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     if ($act === 'override_type') {
         $new_type = in_array($_POST['id_type'],['student','senior','pwd','regular'])?$_POST['id_type']:'regular';
-        $conn->query("UPDATE users SET id_type='$new_type', id_verified=1 WHERE id=$uid");
+        $conn->query("UPDATE users SET id_type='$new_type', id_verified=1, id_status='approved', id_reject_reason=NULL WHERE id=$uid");
         $conn->query("UPDATE id_verifications SET status='approved', notes='Override: type changed to $new_type. $notes', reviewed_by=$admin_id, updated_at=NOW() WHERE id=$vid");
         $msg = "ID type overridden to ".ucfirst($new_type).".";
     }
@@ -158,10 +158,13 @@ function openReview(v) {
   document.getElementById('rev-uid').value   = v.user_id;
   document.getElementById('rev-notes').value = v.notes || '';
   const icons = {student:'🎓',senior:'👴',pwd:'♿',regular:'🪪'};
+  const imgHtml = v.id_image
+    ? `<div style="margin-top:12px"><p style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Uploaded ID Photo</p><img src="${v.id_image}" style="max-width:100%;max-height:220px;border-radius:10px;border:1px solid var(--border);object-fit:cover"/></div>`
+    : `<p style="margin-top:10px;font-size:12px;color:var(--muted)">⚠️ No ID image uploaded yet.</p>`;
   document.getElementById('review-info').innerHTML =
     `<b>${v.first_name} ${v.last_name}</b> — ${v.email}<br>
-     AI Detected: ${icons[v.id_type]||'🪪'} <b>${v.id_type}</b> &nbsp;|&nbsp; Current: ${icons[v.current_id_type]||'🪪'} ${v.current_id_type}<br>
-     Status: <b>${v.status}</b>`;
+     Submitted: ${icons[v.id_type]||'🪪'} <b>${v.id_type}</b> &nbsp;|&nbsp; Current: ${icons[v.current_id_type]||'🪪'} ${v.current_id_type}<br>
+     Status: <b>${v.status}</b>${imgHtml}`;
   const sel = document.getElementById('rev-idtype');
   for(let o of sel.options) if(o.value === v.id_type) o.selected = true;
   openModal('modal-review');

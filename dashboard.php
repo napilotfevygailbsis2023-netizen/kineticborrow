@@ -468,17 +468,34 @@ $id_labels = ['student'=>'Student ID','senior'=>'Senior Citizen ID','pwd'=>'PWD 
   </div>
 
 <!-- ══ PROFILE ══ -->
-<?php elseif($page==='profile'): ?>
+<?php elseif($page==='profile'):
+  // Flash messages from upload
+  $upload_msg   = $_SESSION['id_upload_msg']   ?? ''; unset($_SESSION['id_upload_msg']);
+  $upload_error = $_SESSION['id_upload_error'] ?? ''; unset($_SESSION['id_upload_error']);
+  // Refresh user from DB to get latest id_status
+  $user = $conn->query("SELECT * FROM users WHERE id={$user['id']}")->fetch_assoc();
+  $_SESSION['user'] = $user;
+  $id_status = $user['id_status'] ?? 'none';
+?>
   <div class="profile-wrap">
+
+    <!-- PROFILE CARD -->
     <div class="profile-card">
       <div class="profile-avatar"><?= strtoupper(substr($user['first_name'],0,1)) ?></div>
       <p class="profile-name"><?= htmlspecialchars($user['first_name'].' '.$user['last_name']) ?></p>
       <p class="profile-email"><?= htmlspecialchars($user['email']) ?></p>
-      <?php if($user['id_type'] !== 'regular'): ?>
-      <div class="verified-pill">✅ <?= $id_labels[$user['id_type']] ?> Verified</div>
+      <?php if($id_status === 'approved' && $user['id_type'] !== 'regular'): ?>
+        <div class="verified-pill">✅ <?= $id_labels[$user['id_type']] ?> — 20% Discount Active</div>
+      <?php elseif($id_status === 'pending'): ?>
+        <div class="verified-pill" style="background:#FEF3E2;color:#E07C35;border-color:#FADDB8">⏳ ID Under Review</div>
+      <?php elseif($id_status === 'rejected'): ?>
+        <div class="verified-pill" style="background:#FDECEA;color:#C0392B;border-color:#F5C6C2">❌ ID Rejected — Please resubmit</div>
+      <?php else: ?>
+        <div class="verified-pill" style="background:#F2F0EE;color:#8A8078;border-color:#E5E0D8">🪪 No ID submitted yet</div>
       <?php endif; ?>
     </div>
 
+    <!-- STATS -->
     <div class="stats-grid">
       <div class="stat-card"><p class="stat-icon">🏅</p><p class="stat-val"><?= count($rentals) ?></p><p class="stat-lbl">Total Rentals</p></div>
       <div class="stat-card"><p class="stat-icon">⭐</p><p class="stat-val"><?= number_format($user['loyalty_pts']) ?></p><p class="stat-lbl">Loyalty Points</p></div>
@@ -486,12 +503,74 @@ $id_labels = ['student'=>'Student ID','senior'=>'Senior Citizen ID','pwd'=>'PWD 
       <div class="stat-card"><p class="stat-icon">💰</p><p class="stat-val">₱<?= number_format(array_sum(array_map(fn($r)=>$r['total_amount']*($r['discount_pct']/100)/(1-$r['discount_pct']/100),array_filter($rentals,fn($r)=>$r['discount_pct']>0))),0) ?></p><p class="stat-lbl">Total Saved</p></div>
     </div>
 
+    <!-- ID UPLOAD CARD -->
+    <div class="settings-card" style="margin-bottom:16px">
+      <p class="settings-title">🪪 Upload ID for Discount</p>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.6">
+        Upload a clear photo of your valid ID to receive a <strong style="color:var(--gold)">20% discount</strong> on all rentals.
+        Eligible IDs: Student ID, Senior Citizen ID, or PWD ID.
+      </p>
+
+      <?php if($upload_msg): ?>
+        <div style="background:#EAF6EE;color:#2E8B57;border:1px solid #C0E0CC;border-radius:10px;padding:12px 14px;font-size:13px;font-weight:500;margin-bottom:16px">✅ <?= htmlspecialchars($upload_msg) ?></div>
+      <?php endif; ?>
+      <?php if($upload_error): ?>
+        <div style="background:#FDECEA;color:#C0392B;border:1px solid #F5C6C2;border-radius:10px;padding:12px 14px;font-size:13px;font-weight:500;margin-bottom:16px">⚠️ <?= htmlspecialchars($upload_error) ?></div>
+      <?php endif; ?>
+      <?php if($id_status === 'rejected' && $user['id_reject_reason']): ?>
+        <div style="background:#FDECEA;color:#C0392B;border:1px solid #F5C6C2;border-radius:10px;padding:12px 14px;font-size:13px;margin-bottom:16px">
+          <strong>Rejection reason:</strong> <?= htmlspecialchars($user['id_reject_reason']) ?>
+        </div>
+      <?php endif; ?>
+
+      <?php if($id_status === 'approved'): ?>
+        <!-- Already approved -->
+        <div style="background:#EAF6EE;border:1px solid #C0E0CC;border-radius:12px;padding:16px;text-align:center">
+          <p style="font-size:22px;margin-bottom:6px">✅</p>
+          <p style="font-weight:600;color:#2E8B57;font-size:14px">Your <?= ucfirst($user['id_type']) ?> ID has been verified!</p>
+          <p style="font-size:12px;color:#2E8B57;margin-top:4px">20% discount is automatically applied to all your rentals.</p>
+          <?php if($user['id_image']): ?>
+          <div style="margin-top:14px">
+            <p style="font-size:11px;color:#2E8B57;margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Submitted ID</p>
+            <img src="<?= htmlspecialchars($user['id_image']) ?>" style="max-width:100%;max-height:180px;border-radius:10px;border:2px solid #C0E0CC;object-fit:cover"/>
+          </div>
+          <?php endif; ?>
+          <p style="font-size:12px;color:#2E8B57;margin-top:12px">Need to update your ID? <a href="#" onclick="document.getElementById('reupload-form').style.display='block';this.style.display='none'" style="color:var(--gold);font-weight:600">Resubmit here</a></p>
+          <div id="reupload-form" style="display:none;margin-top:14px">
+            <?php include_once 'includes/id_upload_form.php'; ?>
+          </div>
+        </div>
+
+      <?php elseif($id_status === 'pending'): ?>
+        <!-- Pending review -->
+        <div style="background:#FEF3E2;border:1px solid #FADDB8;border-radius:12px;padding:16px;text-align:center">
+          <p style="font-size:28px;margin-bottom:8px">⏳</p>
+          <p style="font-weight:600;color:#E07C35;font-size:14px">Your ID is being reviewed</p>
+          <p style="font-size:12px;color:#E07C35;margin-top:4px">Our team will verify your ID within 24 hours. You'll receive your 20% discount once approved.</p>
+          <?php if($user['id_image']): ?>
+          <div style="margin-top:14px">
+            <p style="font-size:11px;color:#E07C35;margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Submitted ID</p>
+            <img src="<?= htmlspecialchars($user['id_image']) ?>" style="max-width:100%;max-height:180px;border-radius:10px;border:2px solid #FADDB8;object-fit:cover"/>
+          </div>
+          <?php endif; ?>
+          <p style="font-size:12px;color:#E07C35;margin-top:12px">Wrong file? <a href="#" onclick="document.getElementById('reupload-form').style.display='block';this.style.display='none'" style="color:var(--gold);font-weight:600">Resubmit here</a></p>
+          <div id="reupload-form" style="display:none;margin-top:14px">
+            <?php include_once 'includes/id_upload_form.php'; ?>
+          </div>
+        </div>
+
+      <?php else: ?>
+        <!-- No ID or rejected — show upload form -->
+        <?php include_once 'includes/id_upload_form.php'; ?>
+      <?php endif; ?>
+    </div>
+
+    <!-- ACCOUNT SETTINGS -->
     <div class="settings-card">
       <p class="settings-title">Account Settings</p>
       <div class="settings-item"><span class="settings-item-lbl">Edit Profile</span><span class="settings-arrow">›</span></div>
       <div class="settings-item"><span class="settings-item-lbl">Change Password</span><span class="settings-arrow">›</span></div>
       <div class="settings-item"><span class="settings-item-lbl">Notification Preferences</span><span class="settings-arrow">›</span></div>
-      <div class="settings-item"><span class="settings-item-lbl">Manage ID Documents</span><span class="settings-arrow">›</span></div>
       <a href="logout.php" class="settings-item" style="text-decoration:none">
         <span class="settings-item-lbl danger">Log Out</span><span class="settings-arrow">›</span>
       </a>

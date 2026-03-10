@@ -198,6 +198,9 @@ $menu_label = $active_menu ?? '';
     <a class="nav-item <?= $menu_label==='promotions'?'active':'' ?>" href="admin_promotions.php">
       <span class="nav-icon">🎁</span> Promotions
     </a>
+    <a class="nav-item <?= $menu_label==='incidents'?'active':'' ?>" href="admin_incidents.php">
+      <span class="nav-icon">🚨</span> Incidents
+    </a>
     <a class="nav-item <?= $menu_label==='reports'?'active':'' ?>" href="admin_reports.php">
       <span class="nav-icon">📈</span> Reports
     </a>
