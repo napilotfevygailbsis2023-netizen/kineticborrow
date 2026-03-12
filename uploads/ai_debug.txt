@@ -1,0 +1,38 @@
+2026-03-12 23:37:42
+CURL ERROR: 
+RESPONSE: {
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "{\"is_valid_id\": true, \"id_category\": \"student\", \"id_type_label\": \"University of Caloocan City Student ID\", \"confidence\": 95, \"issues\": [], \"auto_approve\": true, \"reject_reason\": null, \"discount_eligible\": true}"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "index": 0
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 492,
+    "candidatesTokenCount": 67,
+    "totalTokenCount": 1034,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 234
+      },
+      {
+        "modality": "IMAGE",
+        "tokenCount": 258
+      }
+    ],
+    "thoughtsTokenCount": 475
+  },
+  "modelVersion": "gemini-2.5-flash",
+  "responseId": "L0CzabfZNbyImNMPpOOX6A8"
+}
+
+---

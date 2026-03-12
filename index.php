@@ -67,12 +67,36 @@ $cat_icons = [
     .hero-title .hl-gold{color:var(--gold);}
     .hero-title .hl-red{color:var(--red);}
     .hero-sub{font-size:15px;color:var(--text2);line-height:1.7;margin-bottom:30px;max-width:440px;}
-    .hero-search{display:flex;max-width:520px;background:#fff;border-radius:12px;overflow:hidden;border:1.5px solid var(--border);box-shadow:0 4px 20px rgba(0,0,0,.08);}
-    .hero-search-icon{padding:0 16px;font-size:18px;display:flex;align-items:center;color:#C0B8AE;}
-    .hero-search input{flex:1;border:none;outline:none;padding:14px 8px;font-family:'DM Sans',sans-serif;font-size:14px;color:var(--text);background:transparent;}
+    /* SEARCH BAR + DROPDOWN */
+    .hero-search-wrap{position:relative;max-width:540px;}
+    .hero-search{display:flex;background:#fff;border-radius:12px;border:1.5px solid var(--border);box-shadow:0 4px 20px rgba(0,0,0,.08);position:relative;z-index:202;overflow:hidden;}
+    .hero-search-icon{padding:0 16px;font-size:18px;display:flex;align-items:center;color:#C0B8AE;flex-shrink:0;}
+    .hero-search input{flex:1;border:none;outline:none;padding:14px 8px;font-family:'DM Sans',sans-serif;font-size:14px;color:var(--text);background:transparent;min-width:0;}
     .hero-search input::placeholder{color:#C0B8AE;}
-    .hero-search-btn{background:var(--gold);color:#fff;border:none;padding:0 28px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;cursor:pointer;transition:background .18s;}
+    .hero-search-btn{background:var(--gold);color:#fff;border:none;padding:0 28px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;cursor:pointer;transition:background .18s;flex-shrink:0;}
     .hero-search-btn:hover{background:var(--gold-lt);}
+    .search-dropdown{display:none;position:absolute;top:calc(100% + 10px);left:0;right:0;background:#fff;border-radius:16px;box-shadow:0 16px 56px rgba(0,0,0,.16);border:1px solid var(--border);z-index:201;overflow:hidden;}
+    .search-dropdown.show{display:block;}
+    .sd-section{padding:14px 16px 10px;}
+    .sd-label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;}
+    .sd-chips{display:flex;flex-wrap:wrap;gap:7px;}
+    .sd-chip{background:var(--bg);border:1.5px solid var(--border);border-radius:20px;padding:5px 13px;font-size:12px;font-weight:500;color:var(--text2);cursor:pointer;white-space:nowrap;transition:all .15s;}
+    .sd-chip:hover{border-color:var(--gold);background:var(--gold-bg);color:var(--gold);}
+    .sd-hr{height:1px;background:var(--border);}
+    .sd-cols{display:grid;grid-template-columns:1fr 1fr;}
+    .sd-col{padding:12px 16px 14px;}
+    .sd-col+.sd-col{border-left:1px solid var(--border);}
+    .sd-row{display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:10px;cursor:pointer;transition:background .14s;}
+    .sd-row:hover{background:var(--bg);}
+    .sd-badge{width:20px;height:20px;border-radius:6px;background:var(--gold);color:#fff;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+    .sd-icon{font-size:22px;flex-shrink:0;}
+    .sd-cat-box{width:36px;height:36px;background:var(--gold-bg);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+    .sd-info{flex:1;min-width:0;}
+    .sd-name{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .sd-sub{font-size:11px;color:var(--muted);margin-top:1px;}
+    .sd-price{font-size:12px;font-weight:700;color:var(--gold);flex-shrink:0;margin-left:4px;}
+    .sd-results-wrap{padding:6px 8px 8px;}
+    .sd-no{padding:20px;text-align:center;color:var(--muted);font-size:13px;}
     .hero-circle{width:320px;height:320px;border-radius:50%;background:rgba(196,127,43,.12);display:flex;align-items:center;justify-content:center;font-size:120px;position:relative;z-index:1;}
 
     /* SECTIONS */
@@ -194,10 +218,38 @@ $cat_icons = [
       Gear in <span class="hl-red">the Philippines</span>
     </h1>
     <p class="hero-sub">Your all-in-one platform for renting sports equipment — bikes, rackets, kayaks, and more. Browse, book, and play.</p>
-    <div class="hero-search">
-      <div class="hero-search-icon">🔍</div>
-      <input type="text" id="hero-search" placeholder="Search equipment, categories, or brands..."/>
-      <button class="hero-search-btn" onclick="doSearch()">Search</button>
+    <div class="hero-search-wrap" id="search-wrap">
+      <div class="hero-search">
+        <div class="hero-search-icon">🔍</div>
+        <input type="text" id="hero-search" placeholder="Search equipment, categories, or brands..."
+          autocomplete="off"
+          onfocus="openDropdown()"
+          oninput="filterDropdown(this.value)"/>
+        <button class="hero-search-btn" onclick="doSearch()">Search</button>
+      </div>
+      <!-- SEARCH DROPDOWN -->
+      <div class="search-dropdown" id="search-dropdown">
+        <div id="sd-default">
+          <div class="sd-section">
+            <div class="sd-label">Popular searches</div>
+            <div class="sd-chips" id="sd-chips"></div>
+          </div>
+          <div class="sd-hr"></div>
+          <div class="sd-cols">
+            <div class="sd-col">
+              <div class="sd-label">🏆 Top Equipment</div>
+              <div id="sd-top-eq"></div>
+            </div>
+            <div class="sd-col">
+              <div class="sd-label">📂 Browse by Category</div>
+              <div id="sd-categories"></div>
+            </div>
+          </div>
+        </div>
+        <div id="sd-results" style="display:none">
+          <div class="sd-results-wrap" id="sd-results-list"></div>
+        </div>
+      </div>
     </div>
   </div>
   <div class="hero-circle">🏆</div>
@@ -336,9 +388,106 @@ $cat_icons = [
   function promptLogin() { document.getElementById('modal-overlay').classList.add('show'); }
   function closeModal(e) { if(e.target===document.getElementById('modal-overlay')) document.getElementById('modal-overlay').classList.remove('show'); }
   function closeModalDirect() { document.getElementById('modal-overlay').classList.remove('show'); }
+  // ── SMART SEARCH DROPDOWN ──────────────────────────────────────
+  const allEquipment = <?php
+    $eq_js = array_map(fn($e) => [
+      'name'     => $e['name'],
+      'category' => $e['category'],
+      'price'    => (float)$e['price_per_day'],
+      'icon'     => $e['icon'],
+      'rating'   => (float)$e['rating'],
+    ], $equipment);
+    echo json_encode($eq_js);
+  ?>;
+
+  const popularChips = ['Mountain Bike','Surfboard','Badminton','Kayak','Football','Boxing Gloves','Tennis','Volleyball'];
+  const catIcons = {'Cycling':'🚵','Racket Sports':'🏸','Water Sports':'🏄','Combat Sports':'🥊','Team Sports':'⚽','Outdoor':'🏕️'};
+
+  function buildDefault() {
+    // Chips
+    document.getElementById('sd-chips').innerHTML = popularChips.slice(0,6).map(c =>
+      `<span class="sd-chip" onclick="setSearch('${c}')">${c}</span>`
+    ).join('');
+
+    // Top equipment sorted by rating
+    const top = [...allEquipment].sort((a,b)=>b.rating-a.rating).slice(0,4);
+    document.getElementById('sd-top-eq').innerHTML = top.map((e,i) =>
+      `<div class="sd-row" onclick="setSearch('${e.name}')">
+        <div class="sd-badge">${i+1}</div>
+        <span class="sd-icon">${e.icon}</span>
+        <div class="sd-info">
+          <div class="sd-name">${e.name}</div>
+          <div class="sd-sub">${e.category}</div>
+        </div>
+        <span class="sd-price">₱${e.price}/day</span>
+      </div>`
+    ).join('');
+
+    // Categories
+    const cats = [...new Set(allEquipment.map(e=>e.category))];
+    document.getElementById('sd-categories').innerHTML = cats.slice(0,5).map(cat => {
+      const count = allEquipment.filter(e=>e.category===cat).length;
+      return `<div class="sd-row" onclick="setSearch('${cat}')">
+        <div class="sd-cat-box">${catIcons[cat]||'🏋️'}</div>
+        <div class="sd-info">
+          <div class="sd-name">${cat}</div>
+          <div class="sd-sub">${count} item${count!==1?'s':''}</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function openDropdown() {
+    buildDefault();
+    document.getElementById('sd-default').style.display = 'block';
+    document.getElementById('sd-results').style.display  = 'none';
+    document.getElementById('search-dropdown').classList.add('show');
+  }
+
+  function filterDropdown(q) {
+    document.getElementById('search-dropdown').classList.add('show');
+    if (!q.trim()) { openDropdown(); return; }
+    document.getElementById('sd-default').style.display = 'none';
+    document.getElementById('sd-results').style.display  = 'block';
+    const matches = allEquipment.filter(e=>
+      e.name.toLowerCase().includes(q.toLowerCase()) ||
+      e.category.toLowerCase().includes(q.toLowerCase())
+    ).slice(0,6);
+    const list = document.getElementById('sd-results-list');
+    if (!matches.length) {
+      list.innerHTML = `<div class="sd-no">😕 No equipment found for "<strong>${q}</strong>"</div>`;
+    } else {
+      list.innerHTML = matches.map(e =>
+        `<div class="sd-row" onclick="setSearch('${e.name}')">
+          <span class="sd-icon">${e.icon}</span>
+          <div class="sd-info">
+            <div class="sd-name">${e.name}</div>
+            <div class="sd-sub">${e.category} · ⭐ ${e.rating}</div>
+          </div>
+          <span class="sd-price">₱${e.price}/day</span>
+        </div>`
+      ).join('');
+    }
+  }
+
+  function setSearch(val) {
+    document.getElementById('hero-search').value = val;
+    closeDropdown(); doSearch();
+  }
+  function closeDropdown() { document.getElementById('search-dropdown').classList.remove('show'); }
+  document.addEventListener('click', e => { if(!document.getElementById('search-wrap').contains(e.target)) closeDropdown(); });
+
   function doSearch() {
     const q = document.getElementById('hero-search').value.trim();
-    if (q) { scrollToEquipment(); }
+    closeDropdown();
+    if (q) {
+      scrollToEquipment();
+      document.querySelectorAll('.eq-card').forEach(card => {
+        const name = card.querySelector('.eq-name')?.textContent.toLowerCase()||'';
+        const cat  = card.querySelector('.eq-cat')?.textContent.toLowerCase()||'';
+        card.style.display = (name.includes(q.toLowerCase())||cat.includes(q.toLowerCase())) ? '' : 'none';
+      });
+    }
   }
 </script>
 </body>
