@@ -264,25 +264,36 @@ $id_labels = ['student'=>'Student ID','senior'=>'Senior Citizen ID','pwd'=>'PWD 
   </style>
 </head>
 <body>
-
-<nav>
-  <a class="brand" href="dashboard.php">
-    <span style="font-size:22px">🏋️</span>
-    <span class="brand-name">Kinetic<span>Borrow</span></span>
-  </a>
-  <div class="nav-links">
-    <a class="nav-btn <?= $page==='browse'  ? 'active':'' ?>" href="dashboard.php?page=browse">Browse</a>
-    <a class="nav-btn <?= $page==='cart'    ? 'active':'' ?>" href="dashboard.php?page=cart">
-      Cart <?php if(count($_SESSION['cart'])>0): ?><span class="cart-badge"><?= count($_SESSION['cart']) ?></span><?php endif; ?>
+<nav style="display: flex; align-items: center; justify-content: space-between; padding: 0 40px; height: 70px;">
+  
+  <div style="flex: 1; display: flex; justify-content: flex-start;">
+    <a class="brand" href="dashboard.php" style="text-decoration: none;">
+      <span style="font-size:22px">🏋️</span>
+      <span class="brand-name">Kinetic<span>Borrow</span></span>
     </a>
-    <a class="nav-btn <?= $page==='history' ? 'active':'' ?>" href="dashboard.php?page=history">History</a>
-    <a class="nav-btn <?= $page==='profile' ? 'active':'' ?>" href="dashboard.php?page=profile">Profile</a>
   </div>
-  <div class="nav-user">
-    <div class="avatar"><?= strtoupper(substr($user['first_name'],0,1)) ?></div>
-    <span><?= htmlspecialchars($user['first_name'].' '.substr($user['last_name'],0,1)) ?>.</span>
+
+  <div class="nav-links" style="flex: 1; display: flex; justify-content: center; gap: 20px;">
+    <a class="nav-btn <?= $page==='browse'  ? 'active':'' ?>" href="dashboard.php?page=browse">Browse</a>
+    <a class="nav-btn <?= $page==='history' ? 'active':'' ?>" href="dashboard.php?page=history">History</a>
+  </div>
+
+  <div class="nav-user" style="flex: 1; display: flex; justify-content: flex-end; align-items: center; gap: 15px;">
+    <a class="nav-btn <?= $page==='cart' ? 'active':'' ?>" href="dashboard.php?page=cart" style="position: relative; border:none; display: flex; align-items: center; gap: 5px;">
+       <i class="fa-solid fa-cart-shopping"></i>
+       <?php if(isset($_SESSION['cart']) && count($_SESSION['cart']) > 0): ?>
+          <span class="cart-badge"><?= count($_SESSION['cart']) ?></span>
+       <?php endif; ?>
+    </a>
+
+    <a href="dashboard.php?page=profile" style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit;">
+        <div class="avatar"><?= strtoupper(substr($user['first_name'],0,1)) ?></div>
+        <span class="brand-name" style="font-size: 14px;"><?= htmlspecialchars($user['first_name'].' '.substr($user['last_name'],0,1)) ?>.</span>
+    </a>
+
     <a class="logout-btn" href="logout.php">Log Out</a>
   </div>
+
 </nav>
 
 <div class="container">
