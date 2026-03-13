@@ -2,9 +2,12 @@
 require_once 'includes/auth.php';
 require_once 'includes/db.php';
 requireLogin();
+require_once 'vendor/autoload.php';
+$dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
+$dotenv->load();
 
 // ── GEMINI API KEY (free at aistudio.google.com) ─────────────────
-define('GEMINI_API_KEY', 'AIzaSyBuXz08BJ_DJpCA-qptMuPBfdXgIPcdE88');
+define('GEMINI_API_KEY', $_ENV['GEMINI_API_KEY']);
 
 $user_id = $_SESSION['user_id'];
 
