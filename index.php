@@ -58,7 +58,7 @@ $cat_icons = [
     .btn-signup:hover{background:var(--gold-lt);box-shadow:0 4px 14px rgba(196,127,43,.3);transform:translateY(-1px);}
 
     /* HERO */
-    .hero{background:linear-gradient(135deg,#FDF5E8 0%,#FFF0D8 35%,#FDE8CE 60%,#F8E0D8 100%);padding:70px 80px;display:flex;align-items:center;justify-content:space-between;min-height:460px;position:relative;overflow:hidden;}
+    .hero{background:linear-gradient(135deg,#FDF5E8 0%,#FFF0D8 35%,#FDE8CE 60%,#F8E0D8 100%);padding:70px 80px;display:flex;align-items:center;justify-content:space-between;min-height:460px;position:relative;overflow:visible;}
     .hero::after{content:'';position:absolute;right:-60px;top:50%;transform:translateY(-50%);width:420px;height:420px;border-radius:50%;background:rgba(196,127,43,.1);}
     .hero-content{max-width:560px;position:relative;z-index:1;}
     .hero-dots{display:flex;gap:7px;margin-bottom:20px;}
@@ -75,7 +75,7 @@ $cat_icons = [
     .hero-search input::placeholder{color:#C0B8AE;}
     .hero-search-btn{background:var(--gold);color:#fff;border:none;padding:0 28px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;cursor:pointer;transition:background .18s;flex-shrink:0;}
     .hero-search-btn:hover{background:var(--gold-lt);}
-    .search-dropdown{display:none;position:absolute;top:calc(100% + 10px);left:0;right:0;background:#fff;border-radius:16px;box-shadow:0 16px 56px rgba(0,0,0,.16);border:1px solid var(--border);z-index:201;overflow:hidden;}
+    .search-dropdown{display:none;position:absolute;top:calc(100% + 10px);left:0;right:0;background:#fff;border-radius:16px;box-shadow:0 16px 56px rgba(0,0,0,.16);border:1px solid var(--border);z-index:201;max-height:420px;overflow-y:auto;}
     .search-dropdown.show{display:block;}
     .sd-section{padding:14px 16px 10px;}
     .sd-label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;}
@@ -107,7 +107,8 @@ $cat_icons = [
     .eq-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;}
     .eq-card{background:#fff;border:1px solid var(--border);border-radius:14px;overflow:hidden;transition:all .22s;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.04);}
     .eq-card:hover{border-color:var(--gold);transform:translateY(-4px);box-shadow:0 10px 28px rgba(196,127,43,.14);}
-    .eq-card-img{background:var(--gold-bg);padding:22px 0;text-align:center;font-size:44px;border-bottom:1px solid #EDD8B0;}
+    .eq-card-img{background:var(--gold-bg);padding:22px 0;text-align:center;font-size:44px;border-bottom:1px solid #EDD8B0;overflow:hidden;min-height:100px;display:flex;align-items:center;justify-content:center;}
+    .eq-card-img img{width:100%;height:160px;object-fit:cover;display:block;}
     .eq-card-body{padding:14px;}
     .eq-card-name{font-family:'Playfair Display',serif;font-size:15px;font-weight:700;margin-bottom:2px;}
     .eq-card-cat{font-size:11px;color:var(--muted);margin-bottom:8px;}
@@ -258,6 +259,12 @@ $cat_icons = [
 <!-- TOP EQUIPMENT -->
 <section class="section" id="section-equipment">
   <h2 class="section-title">Top Equipment to Rent</h2>
+  <div id="eq-no-results" style="display:none;text-align:center;padding:40px 20px;background:#fff;border-radius:16px;border:1px dashed var(--border);margin-bottom:20px">
+    <div style="font-size:40px;margin-bottom:12px">🔍</div>
+    <div style="font-size:16px;font-weight:600;color:var(--text);margin-bottom:6px">No equipment found</div>
+    <div style="font-size:13px;color:var(--muted)">Try a different search term or browse all categories</div>
+    <button onclick="document.getElementById('hero-search').value='';document.querySelectorAll('.eq-card').forEach(c=>c.style.display='');this.parentElement.style.display='none'" style="margin-top:16px;background:var(--gold);color:#fff;border:none;border-radius:8px;padding:10px 24px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer">Show All Equipment</button>
+  </div>
   <div class="eq-grid">
     <?php foreach ($equipment as $eq): ?>
     <?php
@@ -269,7 +276,14 @@ $cat_icons = [
       elseif ($tag_label === 'Weekend Special') $tag_class = 'tag-ltd';
     ?>
     <div class="eq-card">
-      <div class="eq-card-img"><?= htmlspecialchars($eq['icon']) ?></div>
+      <div class="eq-card-img" style="<?= !empty($eq['image']) ? 'padding:0;' : '' ?>">
+        <?php if(!empty($eq['image'])): ?>
+          <img src="<?= htmlspecialchars($eq['image']) ?>" alt="<?= htmlspecialchars($eq['name']) ?>"
+               onerror="this.parentElement.style.padding='22px 0';this.outerHTML='<span style=\'font-size:44px\'>🏅</span>'"/>
+        <?php else: ?>
+          <span style="font-size:44px"><?= !empty($eq['icon']) ? htmlspecialchars($eq['icon']) : '🏅' ?></span>
+        <?php endif; ?>
+      </div>
       <div class="eq-card-body">
         <p class="eq-card-name"><?= htmlspecialchars($eq['name']) ?></p>
         <p class="eq-card-cat"><?= htmlspecialchars($eq['category']) ?></p>
@@ -394,7 +408,8 @@ $cat_icons = [
       'name'     => $e['name'],
       'category' => $e['category'],
       'price'    => (float)$e['price_per_day'],
-      'icon'     => $e['icon'],
+      'icon'     => $e['icon'] ?? '🏅',
+      'image'    => $e['image'] ?? '',
       'rating'   => (float)$e['rating'],
     ], $equipment);
     echo json_encode($eq_js);
@@ -411,17 +426,20 @@ $cat_icons = [
 
     // Top equipment sorted by rating
     const top = [...allEquipment].sort((a,b)=>b.rating-a.rating).slice(0,4);
-    document.getElementById('sd-top-eq').innerHTML = top.map((e,i) =>
-      `<div class="sd-row" onclick="setSearch('${e.name}')">
+    document.getElementById('sd-top-eq').innerHTML = top.map((e,i) => {
+      const thumb = e.image
+        ? `<img src="${e.image}" style="width:36px;height:36px;object-fit:cover;border-radius:8px;flex-shrink:0" onerror="this.outerHTML='<span style=\'font-size:22px\'>${e.icon||'🏅'}</span>'">`
+        : `<span class="sd-icon">${e.icon||'🏅'}</span>`;
+      return `<div class="sd-row" onclick="setSearch('${e.name}')">
         <div class="sd-badge">${i+1}</div>
-        <span class="sd-icon">${e.icon}</span>
+        ${thumb}
         <div class="sd-info">
           <div class="sd-name">${e.name}</div>
           <div class="sd-sub">${e.category}</div>
         </div>
         <span class="sd-price">₱${e.price}/day</span>
-      </div>`
-    ).join('');
+      </div>`;
+    }).join('');
 
     // Categories
     const cats = [...new Set(allEquipment.map(e=>e.category))];
@@ -457,16 +475,19 @@ $cat_icons = [
     if (!matches.length) {
       list.innerHTML = `<div class="sd-no">😕 No equipment found for "<strong>${q}</strong>"</div>`;
     } else {
-      list.innerHTML = matches.map(e =>
-        `<div class="sd-row" onclick="setSearch('${e.name}')">
-          <span class="sd-icon">${e.icon}</span>
+      list.innerHTML = matches.map(e => {
+        const thumb = e.image
+          ? `<img src="${e.image}" style="width:36px;height:36px;object-fit:cover;border-radius:8px;flex-shrink:0" onerror="this.outerHTML='<span style=\'font-size:22px\'>${e.icon||'🏅'}</span>'">`
+          : `<span class="sd-icon">${e.icon||'🏅'}</span>`;
+        return `<div class="sd-row" onclick="setSearch('${e.name}')">
+          ${thumb}
           <div class="sd-info">
             <div class="sd-name">${e.name}</div>
             <div class="sd-sub">${e.category} · ⭐ ${e.rating}</div>
           </div>
           <span class="sd-price">₱${e.price}/day</span>
-        </div>`
-      ).join('');
+        </div>`;
+      }).join('');
     }
   }
 
@@ -481,14 +502,35 @@ $cat_icons = [
     const q = document.getElementById('hero-search').value.trim();
     closeDropdown();
     if (q) {
-      scrollToEquipment();
+      // Filter equipment cards on the page
+      let anyVisible = false;
       document.querySelectorAll('.eq-card').forEach(card => {
         const name = card.querySelector('.eq-name')?.textContent.toLowerCase()||'';
         const cat  = card.querySelector('.eq-cat')?.textContent.toLowerCase()||'';
-        card.style.display = (name.includes(q.toLowerCase())||cat.includes(q.toLowerCase())) ? '' : 'none';
+        const match = name.includes(q.toLowerCase()) || cat.includes(q.toLowerCase());
+        card.style.display = match ? '' : 'none';
+        if (match) anyVisible = true;
       });
+      // Show "no results" message if nothing matches
+      const noRes = document.getElementById('eq-no-results');
+      if (noRes) noRes.style.display = anyVisible ? 'none' : 'block';
+      scrollToEquipment();
+    } else {
+      // Show all if query cleared
+      document.querySelectorAll('.eq-card').forEach(card => card.style.display = '');
+      const noRes = document.getElementById('eq-no-results');
+      if (noRes) noRes.style.display = 'none';
     }
   }
+
+  // Clear search when input is cleared
+  document.getElementById('hero-search').addEventListener('input', function() {
+    if (!this.value.trim()) {
+      document.querySelectorAll('.eq-card').forEach(card => card.style.display = '');
+      const noRes = document.getElementById('eq-no-results');
+      if (noRes) noRes.style.display = 'none';
+    }
+  });
 </script>
 </body>
 </html>

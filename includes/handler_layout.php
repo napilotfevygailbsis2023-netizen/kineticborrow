@@ -33,7 +33,7 @@ $menu_label = $active_menu ?? '';
     .brand-name{font-family:'Playfair Display',serif;font-size:17px;font-weight:800;color:#fff;}
     .brand-name span{color:var(--gold);}
     .brand-sub{font-size:10px;color:var(--teal-lt);margin-top:2px;letter-spacing:.08em;text-transform:uppercase;}
-    .sidebar-handler{padding:13px 20px;border-bottom:1px solid var(--sidebar3);display:flex;align-items:center;gap:10px;}
+    .sidebar-handler{display:block;}
     .handler-avatar{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--teal),var(--teal-dk));display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;flex-shrink:0;}
     .handler-name{font-size:13px;color:#fff;font-weight:600;}
     .handler-role{font-size:10px;color:var(--teal-lt);text-transform:uppercase;letter-spacing:.06em;}
@@ -169,13 +169,13 @@ $menu_label = $active_menu ?? '';
     <div class="brand-name">Kinetic<span>Borrow</span></div>
     <div class="brand-sub">Handler Portal</div>
   </div>
-  <div class="sidebar-handler">
+  <a href="handler_profile.php" style="display:flex;align-items:center;gap:10px;padding:13px 20px;border-bottom:1px solid var(--sidebar3);text-decoration:none;cursor:pointer;transition:background .18s;background:transparent" onmouseover="this.style.background='#0E3E42'" onmouseout="this.style.background='transparent'" title="View My Profile">
     <div class="handler-avatar"><?= strtoupper(substr($handler['name'],0,1)) ?></div>
     <div>
       <div class="handler-name"><?= htmlspecialchars($handler['name']) ?></div>
-      <div class="handler-role">Equipment Handler</div>
+      <div class="handler-role">Equipment Handler · View Profile →</div>
     </div>
-  </div>
+  </a>
   <nav class="sidebar-nav">
     <div class="nav-section">Operations</div>
     <a class="nav-item <?= $menu_label==='dashboard'?'active':'' ?>" href="handler_dashboard.php">

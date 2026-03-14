@@ -20,16 +20,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $conn->query("UPDATE blocklist SET status='unblocked', updated_at=NOW() WHERE user_id=$uid");
         $msg = "Customer account unblocked.";
     }
-    if ($act === 'edit') {
-        $fn    = $conn->real_escape_string($_POST['first_name']);
-        $ln    = $conn->real_escape_string($_POST['last_name']);
-        $email = $conn->real_escape_string($_POST['email']);
-        $phone = $conn->real_escape_string($_POST['phone']);
-        $id_type = in_array($_POST['id_type'],['student','senior','pwd','regular'])?$_POST['id_type']:'regular';
-        $pts   = intval($_POST['loyalty_pts']);
-        $conn->query("UPDATE users SET first_name='$fn',last_name='$ln',email='$email',phone='$phone',id_type='$id_type',loyalty_pts=$pts WHERE id=$uid");
-        $msg = "Customer updated.";
-    }
 }
 
 $search = $conn->real_escape_string($_GET['q'] ?? '');
@@ -42,7 +32,11 @@ if ($filter === 'student')  $where[] = "u.id_type='student'";
 if ($filter === 'verified') $where[] = "u.id_verified=1";
 if ($where) $sql .= " WHERE ".implode(" AND ",$where);
 $sql .= " GROUP BY u.id ORDER BY u.created_at DESC";
-$customers = $conn->query($sql)->fetch_all(MYSQLI_ASSOC);
+$page  = max(1, intval($_GET['p'] ?? 1));
+$limit = 15; $offset = ($page-1)*$limit;
+$total_c  = $conn->query("SELECT COUNT(DISTINCT u.id) FROM users u".($where?" WHERE ".implode(" AND ",$where):""))->fetch_row()[0];
+$total_pg = max(1, ceil($total_c/$limit));
+$customers = $conn->query($sql." LIMIT $limit OFFSET $offset")->fetch_all(MYSQLI_ASSOC);
 
 include 'includes/admin_layout.php';
 ?>
@@ -50,7 +44,7 @@ include 'includes/admin_layout.php';
 <?php if($msg): ?><div class="alert alert-success">✅ <?= htmlspecialchars($msg) ?></div><?php endif; ?>
 
 <div class="page-head">
-  <div><div class="page-head-title">Customer Accounts</div><div class="page-head-sub">Manage accounts, rental orders, and access</div></div>
+  <div><div class="page-head-title">Customer Accounts</div><div class="page-head-sub">View customer info and manage account status</div></div>
 </div>
 
 <div class="search-bar">
@@ -68,100 +62,97 @@ include 'includes/admin_layout.php';
 
 <div class="table-card">
   <table>
-    <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>ID Type</th><th>Rentals</th><th>Points</th><th>Status</th><th>Actions</th></tr></thead>
+    <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>ID Type</th><th>ID Status</th><th>Rentals</th><th>Points</th><th>Account Status</th><th>Action</th></tr></thead>
     <tbody>
       <?php foreach($customers as $c): ?>
       <tr>
-        <td style="font-weight:600"><?= htmlspecialchars($c['first_name'].' '.$c['last_name']) ?></td>
+        <td>
+          <div style="font-weight:600"><?= htmlspecialchars($c['first_name'].' '.$c['last_name']) ?></div>
+          <div style="font-size:11px;color:var(--muted)">Joined <?= date('M j, Y', strtotime($c['created_at'])) ?></div>
+        </td>
         <td><?= htmlspecialchars($c['email']) ?></td>
         <td><?= htmlspecialchars($c['phone']) ?></td>
+        <td><?php $icons=['student'=>'🎓','senior'=>'👴','pwd'=>'♿','regular'=>'🪪']; echo ($icons[$c['id_type']]??'🪪').' '.ucfirst($c['id_type']); ?></td>
         <td>
-          <?php $icons=['student'=>'🎓','senior'=>'👴','pwd'=>'♿','regular'=>'🪪']; ?>
-          <?= $icons[$c['id_type']] ?? '🪪' ?> <?= ucfirst($c['id_type']) ?>
-          <?php if($c['id_verified']): ?><span class="status-badge s-approved" style="margin-left:4px">✓</span><?php endif; ?>
+          <?php
+          $id_badges = ['approved'=>'s-active','pending'=>'s-pending','rejected'=>'s-cancelled','none'=>'s-returned'];
+          $id_status = $c['id_status'] ?? 'none';
+          echo '<span class="status-badge '.($id_badges[$id_status]??'s-returned').'">'.ucfirst($id_status).'</span>';
+          ?>
         </td>
-        <td><?= $c['rental_count'] ?></td>
-        <td><?= number_format($c['loyalty_pts']) ?> pts</td>
-        <td><span class="status-badge <?= $c['is_blocked']?'s-suspended':'s-active' ?>"><?= $c['is_blocked']?'Blocked':'Active' ?></span></td>
+        <td style="font-weight:600;color:var(--text2)"><?= $c['rental_count'] ?></td>
         <td>
-          <div class="btn-group">
-            <button class="btn btn-outline btn-sm" onclick='openEdit(<?= json_encode($c) ?>)'>Edit</button>
-            <?php if($c['is_blocked']): ?>
+          <span style="font-size:12px;color:var(--gold);font-weight:600">⭐ <?= number_format($c['loyalty_pts']) ?></span>
+        </td>
+        <td>
+          <?php if($c['is_blocked']): ?>
+            <span class="status-badge s-cancelled">🚫 Blocked</span>
+            <?php if($c['block_reason']): ?><div style="font-size:11px;color:var(--red);margin-top:3px"><?= htmlspecialchars(substr($c['block_reason'],0,30)) ?></div><?php endif; ?>
+          <?php else: ?>
+            <span class="status-badge s-active">✓ Active</span>
+          <?php endif; ?>
+        </td>
+        <td>
+          <?php if($c['is_blocked']): ?>
             <form method="POST" style="display:inline">
               <input type="hidden" name="act" value="unblock"/>
               <input type="hidden" name="user_id" value="<?= $c['id'] ?>"/>
               <button type="submit" class="btn btn-green btn-sm">Unblock</button>
             </form>
-            <?php else: ?>
-            <button class="btn btn-red btn-sm" onclick="openBlock(<?= $c['id'] ?>, '<?= addslashes($c['first_name'].' '.$c['last_name']) ?>')">Block</button>
-            <?php endif; ?>
-          </div>
+          <?php else: ?>
+            <button class="btn btn-red btn-sm" onclick="blockCustomer(<?= $c['id'] ?>, '<?= htmlspecialchars(addslashes($c['first_name'].' '.$c['last_name'])) ?>')">Block</button>
+          <?php endif; ?>
         </td>
       </tr>
       <?php endforeach; ?>
-      <?php if(empty($customers)): ?><tr class="empty-row"><td colspan="8">No customers found.</td></tr><?php endif; ?>
+      <?php if(empty($customers)): ?><tr class="empty-row"><td colspan="9">No customers found.</td></tr><?php endif; ?>
     </tbody>
   </table>
-</div>
-
-<!-- EDIT MODAL -->
-<div class="modal-overlay" id="modal-edit">
-  <div class="modal">
-    <div class="modal-header"><h3 class="modal-title">Edit Customer</h3><button class="modal-close" onclick="closeModal('modal-edit')">×</button></div>
-    <form method="POST">
-      <input type="hidden" name="act" value="edit"/>
-      <input type="hidden" name="user_id" id="edit-uid"/>
-      <div class="form-grid">
-        <div class="form-group"><label class="form-label">First Name</label><input class="form-control" name="first_name" id="edit-fn"/></div>
-        <div class="form-group"><label class="form-label">Last Name</label><input class="form-control" name="last_name" id="edit-ln"/></div>
-        <div class="form-group"><label class="form-label">Email</label><input class="form-control" name="email" id="edit-email" type="email"/></div>
-        <div class="form-group"><label class="form-label">Phone</label><input class="form-control" name="phone" id="edit-phone"/></div>
-        <div class="form-group"><label class="form-label">ID Type</label>
-          <select class="form-control" name="id_type" id="edit-idtype">
-            <option value="student">Student</option><option value="senior">Senior Citizen</option><option value="pwd">PWD</option><option value="regular">Regular</option>
-          </select>
-        </div>
-        <div class="form-group"><label class="form-label">Loyalty Points</label><input class="form-control" name="loyalty_pts" id="edit-pts" type="number"/></div>
-      </div>
-      <div class="modal-footer"><button type="button" class="btn btn-outline" onclick="closeModal('modal-edit')">Cancel</button><button type="submit" class="btn btn-gold">Save</button></div>
-    </form>
+  <?php if($total_pg>1): ?>
+  <div class="pager">
+    <?php for($i=1;$i<=$total_pg;$i++): ?>
+      <?php if($i==1||$i==$total_pg||abs($i-$page)<=2): ?>
+        <a href="?filter=<?=$filter?>&q=<?=urlencode($search)?>&p=<?=$i?>" <?=$i==$page?'class="cur"':''?>><?=$i?></a>
+      <?php elseif(abs($i-$page)==3): ?><span style="color:var(--muted);padding:0 4px;border:none">…</span><?php endif; ?>
+    <?php endfor; ?>
   </div>
+  <?php endif; ?>
 </div>
 
 <!-- BLOCK MODAL -->
 <div class="modal-overlay" id="modal-block">
-  <div class="modal">
-    <div class="modal-header"><h3 class="modal-title">Block Customer</h3><button class="modal-close" onclick="closeModal('modal-block')">×</button></div>
+  <div class="modal" style="max-width:440px">
+    <div class="modal-header"><h3 class="modal-title">🚫 Block Customer</h3><button class="modal-close" onclick="closeModal('modal-block')">×</button></div>
     <form method="POST">
       <input type="hidden" name="act" value="block"/>
       <input type="hidden" name="user_id" id="block-uid"/>
-      <p style="font-size:13px;color:var(--muted);margin-bottom:18px">You are about to block <strong id="block-name"></strong>. They will not be able to log in or rent equipment.</p>
-      <div class="form-group"><label class="form-label">Reason</label><textarea class="form-control" name="reason" rows="3" placeholder="Enter reason for blocking..." required></textarea></div>
-      <div class="modal-footer"><button type="button" class="btn btn-outline" onclick="closeModal('modal-block')">Cancel</button><button type="submit" class="btn btn-red">Confirm Block</button></div>
+      <div class="modal-info">Blocking <strong id="block-name"></strong> will prevent them from borrowing equipment.</div>
+      <div class="form-group">
+        <label class="form-label">Reason for blocking *</label>
+        <textarea class="form-control" name="reason" rows="3" placeholder="e.g. Returned equipment damaged, failed to return on time..." required></textarea>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('modal-block')">Cancel</button>
+        <button type="submit" class="btn btn-red">Confirm Block</button>
+      </div>
     </form>
   </div>
 </div>
 
+<style>
+.pager{display:flex;align-items:center;gap:5px;padding:12px 16px;border-top:1px solid var(--border)}
+.pager a,.pager .cur{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none;border:1px solid var(--border);color:var(--text2)}
+.pager a:hover{background:var(--gold-bg);border-color:var(--gold);color:var(--gold)}
+.pager .cur{background:var(--gold);border-color:var(--gold);color:#fff}
+</style>
 <script>
 function openModal(id)  { document.getElementById(id).classList.add('show'); }
 function closeModal(id) { document.getElementById(id).classList.remove('show'); }
-function openEdit(c) {
-  document.getElementById('edit-uid').value   = c.id;
-  document.getElementById('edit-fn').value    = c.first_name;
-  document.getElementById('edit-ln').value    = c.last_name;
-  document.getElementById('edit-email').value = c.email;
-  document.getElementById('edit-phone').value = c.phone;
-  document.getElementById('edit-pts').value   = c.loyalty_pts;
-  const sel = document.getElementById('edit-idtype');
-  for(let o of sel.options) if(o.value === c.id_type) o.selected = true;
-  openModal('modal-edit');
-}
-function openBlock(uid, name) {
-  document.getElementById('block-uid').value  = uid;
+window.onclick = e => { if(e.target.classList.contains('modal-overlay')) e.target.classList.remove('show'); }
+function blockCustomer(uid, name) {
+  document.getElementById('block-uid').value = uid;
   document.getElementById('block-name').textContent = name;
   openModal('modal-block');
 }
-window.onclick = e => { if(e.target.classList.contains('modal-overlay')) e.target.classList.remove('show'); }
 </script>
-
 <?php include 'includes/admin_layout_end.php'; ?>

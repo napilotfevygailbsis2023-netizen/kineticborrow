@@ -65,3 +65,6 @@ INSERT INTO equipment (name, category, price_per_day, stock, rating, review_coun
 -- Sample user (password: password123)
 INSERT INTO users (first_name, last_name, email, phone, password, id_type, id_verified, loyalty_pts) VALUES
 ('Harold', 'Reyes', 'harold.reyes@email.com', '09123456789', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'student', 1, 1820);
+
+-- Add payment_method to rentals if not exists
+ALTER TABLE rentals ADD COLUMN IF NOT EXISTS payment_method VARCHAR(20) DEFAULT 'cash';

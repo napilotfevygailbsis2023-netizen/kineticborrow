@@ -16,28 +16,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $conn->query("UPDATE rentals SET status='$status', {$return_date} admin_notes='$notes' WHERE id=$rid");
         $msg = "Rental status updated.";
     }
-    if ($act === 'update_payment') {
-        $pay = in_array($_POST['payment_status'],['pending','paid','refunded'])?$_POST['payment_status']:'paid';
-        $conn->query("UPDATE rentals SET payment_status='$pay' WHERE id=$rid");
-        $msg = "Payment status updated.";
-    }
 }
 
-$status_f  = $conn->real_escape_string($_GET['status'] ?? '');
-$payment_f = $conn->real_escape_string($_GET['payment'] ?? '');
-$search    = $conn->real_escape_string($_GET['q'] ?? '');
+$status_f = $conn->real_escape_string($_GET['status'] ?? '');
+$search   = $conn->real_escape_string($_GET['q'] ?? '');
 
-$sql = "SELECT r.*, u.first_name, u.last_name, e.name as eq_name, e.icon as eq_icon
+$sql = "SELECT r.*, u.first_name, u.last_name, e.name as eq_name, e.icon as eq_icon,
+               h_out.name as checkout_handler, h_in.name as checkin_handler
         FROM rentals r
         JOIN users u ON r.user_id = u.id
-        JOIN equipment e ON r.equipment_id = e.id";
+        JOIN equipment e ON r.equipment_id = e.id
+        LEFT JOIN handlers h_out ON r.checkout_by = h_out.id
+        LEFT JOIN handlers h_in  ON r.checkin_by  = h_in.id";
 $where = [];
 if ($status_f)  $where[] = "r.status='$status_f'";
-if ($payment_f) $where[] = "r.payment_status='$payment_f'";
 if ($search)    $where[] = "(r.order_code LIKE '%$search%' OR u.first_name LIKE '%$search%' OR u.last_name LIKE '%$search%')";
 if ($where) $sql .= " WHERE ".implode(" AND ",$where);
 $sql .= " ORDER BY r.created_at DESC";
-$rentals = $conn->query($sql)->fetch_all(MYSQLI_ASSOC);
+$page   = max(1, intval($_GET['p'] ?? 1));
+$limit  = 15; $offset = ($page-1)*$limit;
+$count_sql = str_replace("SELECT r.*, u.first_name, u.last_name, e.name as eq_name, e.icon as eq_icon,
+               h_out.name as checkout_handler, h_in.name as checkin_handler", "SELECT COUNT(*)", $sql);
+$total_r = $conn->query($count_sql)->fetch_row()[0];
+$total_pg = max(1, ceil($total_r/$limit));
+$rentals = $conn->query($sql." LIMIT $limit OFFSET $offset")->fetch_all(MYSQLI_ASSOC);
 
 include 'includes/admin_layout.php';
 ?>
@@ -45,94 +47,144 @@ include 'includes/admin_layout.php';
 <?php if($msg): ?><div class="alert alert-success">✅ <?= htmlspecialchars($msg) ?></div><?php endif; ?>
 
 <div class="page-head">
-  <div><div class="page-head-title">Rentals & Orders</div><div class="page-head-sub">Manage rental orders, returns, and payment status</div></div>
+  <div><div class="page-head-title">Rentals & Orders</div><div class="page-head-sub">Monitor bookings, returns, and cancellations</div></div>
 </div>
 
 <div class="search-bar">
   <form method="GET" style="display:contents">
-    <div class="search-wrap"><span class="search-icon">🔍</span><input class="search-input" name="q" placeholder="Search order ID or customer..." value="<?= htmlspecialchars($search) ?>"/></div>
-    <input type="hidden" name="status"  value="<?= htmlspecialchars($status_f) ?>"/>
-    <input type="hidden" name="payment" value="<?= htmlspecialchars($payment_f) ?>"/>
+    <div class="search-wrap"><span class="search-icon">🔍</span><input class="search-input" name="q" placeholder="Search order or customer..." value="<?= htmlspecialchars($search) ?>"/></div>
+    <input type="hidden" name="status" value="<?= htmlspecialchars($status_f) ?>"/>
     <button type="submit" class="btn btn-gold btn-sm">Search</button>
   </form>
   <div style="display:flex;gap:6px;flex-wrap:wrap">
-    <?php foreach([''=> 'All',  'active'=>'Active','returned'=>'Returned','cancelled'=>'Cancelled'] as $k=>$v): ?>
+    <?php foreach([''=> 'All','active'=>'Active','returned'=>'Returned','cancelled'=>'Cancelled'] as $k=>$v): ?>
     <a class="btn <?= $status_f===$k?'btn-gold':'btn-outline' ?> btn-sm" href="admin_rentals.php?status=<?= $k ?><?= $search?"&q=$search":'' ?>"><?= $v ?></a>
-    <?php endforeach; ?>
-    <span style="color:var(--muted);font-size:12px;padding:5px 4px">|</span>
-    <?php foreach([''=> 'Any Payment','pending'=>'Pending','paid'=>'Paid','refunded'=>'Refunded'] as $k=>$v): ?>
-    <a class="btn <?= $payment_f===$k?'btn-blue':'btn-outline' ?> btn-sm" href="admin_rentals.php?payment=<?= $k ?><?= $status_f?"&status=$status_f":'' ?>"><?= $v ?></a>
     <?php endforeach; ?>
   </div>
 </div>
 
 <div class="table-card">
   <table>
-    <thead><tr><th>Order</th><th>Customer</th><th>Equipment</th><th>Days</th><th>Dates</th><th>Total</th><th>Status</th><th>Payment</th><th>Actions</th></tr></thead>
+    <thead><tr><th>Order</th><th>Customer</th><th>Equipment</th><th>Dates</th><th>Total</th><th>Payment</th><th>Status</th><th>Handler</th><th>Action</th></tr></thead>
     <tbody>
       <?php foreach($rentals as $r): ?>
       <tr>
-        <td style="color:var(--gold);font-weight:600"><?= htmlspecialchars($r['order_code']) ?></td>
-        <td><?= htmlspecialchars($r['first_name'].' '.$r['last_name']) ?></td>
-        <td><?= $r['eq_icon'] ?> <?= htmlspecialchars($r['eq_name']) ?></td>
-        <td><?= $r['days'] ?> day<?= $r['days']>1?'s':'' ?></td>
-        <td style="font-size:12px;color:var(--muted)"><?= date('M j', strtotime($r['start_date'])) ?> – <?= date('M j', strtotime($r['end_date'])) ?></td>
-        <td style="font-weight:600">₱<?= number_format($r['total_amount'],0) ?></td>
-        <td><span class="status-badge s-<?= $r['status'] ?>"><?= ucfirst($r['status']) ?></span></td>
-        <td><span class="status-badge s-<?= $r['payment_status'] ?? 'paid' ?>"><?= ucfirst($r['payment_status'] ?? 'paid') ?></span></td>
-        <td><button class="btn btn-outline btn-sm" onclick='openRental(<?= json_encode($r) ?>)'>Manage</button></td>
+        <td style="color:var(--gold);font-weight:700;font-size:13px"><?= $r['order_code'] ?></td>
+        <td>
+          <div style="font-weight:600"><?= htmlspecialchars($r['first_name'].' '.$r['last_name']) ?></div>
+          <div style="font-size:11px;color:var(--muted)"><?= date('M j, Y', strtotime($r['created_at'])) ?></div>
+        </td>
+        <td><?= $r['eq_icon'] ?> <?= htmlspecialchars($r['eq_name']) ?><br><span style="font-size:11px;color:var(--muted)"><?= $r['days'] ?> day<?= $r['days']>1?'s':'' ?></span></td>
+        <td style="font-size:12px">
+          <?= date('M j', strtotime($r['start_date'])) ?> → <?= date('M j, Y', strtotime($r['end_date'])) ?>
+          <?php if($r['return_date']): ?>
+            <div style="color:var(--green);font-size:11px">Returned <?= date('M j', strtotime($r['return_date'])) ?></div>
+          <?php endif; ?>
+        </td>
+        <td>
+          <strong>₱<?= number_format($r['total_amount'],0) ?></strong>
+          <?php if($r['discount_pct']>0): ?><div style="font-size:11px;color:var(--green)"><?= $r['discount_pct'] ?>% disc.</div><?php endif; ?>
+        </td>
+        <td>
+          <?php
+          // Payment is only set AFTER handler checkout — before that show as not yet paid
+          $paid = $r['payment_status'] === 'paid';
+          $checkedout = !empty($r['checkout_at']);
+          if (!$checkedout): ?>
+            <span class="status-badge s-returned" style="color:var(--muted)">— Not yet</span>
+          <?php elseif($paid): ?>
+            <span class="status-badge s-active">✓ Paid</span>
+          <?php elseif($r['payment_status']==='refunded'): ?>
+            <span class="status-badge s-reviewed">Refunded</span>
+          <?php else: ?>
+            <span class="status-badge s-pending">Pending</span>
+          <?php endif; ?>
+        </td>
+        <td>
+          <?php
+          $sbadge = ['active'=>'s-active','returned'=>'s-returned','cancelled'=>'s-cancelled'];
+          echo '<span class="status-badge '.($sbadge[$r['status']]??'s-pending').'">'.ucfirst($r['status']).'</span>';
+          ?>
+        </td>
+        <td style="font-size:12px;color:var(--muted)">
+          <?php if($r['checkout_handler']): ?>
+            <div>↑ <?= htmlspecialchars($r['checkout_handler']) ?></div>
+          <?php endif; ?>
+          <?php if($r['checkin_handler']): ?>
+            <div>↓ <?= htmlspecialchars($r['checkin_handler']) ?></div>
+          <?php endif; ?>
+          <?php if(!$r['checkout_handler'] && !$r['checkin_handler']): ?>
+            <span style="color:var(--muted)">—</span>
+          <?php endif; ?>
+        </td>
+        <td>
+          <?php if($r['status'] === 'active'): ?>
+            <button class="btn btn-outline btn-sm" onclick="updateStatus(<?= $r['id'] ?>,'<?= $r['order_code'] ?>','<?= $r['status'] ?>')">Update</button>
+          <?php else: ?>
+            <span style="font-size:11px;color:var(--muted)">
+              <?= $r['status']==='returned'?'↓ By handler':'✕ By customer' ?>
+            </span>
+          <?php endif; ?>
+        </td>
       </tr>
       <?php endforeach; ?>
       <?php if(empty($rentals)): ?><tr class="empty-row"><td colspan="9">No rentals found.</td></tr><?php endif; ?>
     </tbody>
   </table>
+  <?php if($total_pg > 1): ?>
+  <div class="pager">
+    <?php for($i=1;$i<=$total_pg;$i++): ?>
+      <?php if($i==1||$i==$total_pg||abs($i-$page)<=2): ?>
+        <a href="?status=<?=$status_f?>&q=<?=$search?>&p=<?=$i?>" <?=$i==$page?'class="cur"':''?>><?=$i?></a>
+      <?php elseif(abs($i-$page)==3): ?><span style="color:var(--muted);padding:0 4px;border:none">…</span><?php endif; ?>
+    <?php endfor; ?>
+  </div>
+  <?php endif; ?>
 </div>
 
-<!-- MANAGE MODAL -->
-<div class="modal-overlay" id="modal-rental">
-  <div class="modal">
-    <div class="modal-header"><h3 class="modal-title">Manage Rental <span id="modal-order" style="color:var(--gold)"></span></h3><button class="modal-close" onclick="closeModal('modal-rental')">×</button></div>
-    <div style="background:var(--bg);border-radius:10px;padding:14px;margin-bottom:20px;font-size:13px" id="rental-info"></div>
+<!-- UPDATE STATUS MODAL (only for active rentals, admin can only cancel) -->
+<div class="modal-overlay" id="modal-status">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-header"><h3 class="modal-title">Update Rental</h3><button class="modal-close" onclick="closeModal('modal-status')">×</button></div>
     <form method="POST">
       <input type="hidden" name="act" value="update_status"/>
-      <input type="hidden" name="rental_id" id="rental-id"/>
-      <div class="form-group"><label class="form-label">Rental Status</label>
-        <select class="form-control" name="status" id="rental-status">
-          <option value="active">Active</option>
-          <option value="returned">Returned</option>
-          <option value="cancelled">Cancelled</option>
+      <input type="hidden" name="rental_id" id="modal-rid"/>
+      <div class="modal-info" id="modal-order-info"></div>
+      <div class="form-group">
+        <label class="form-label">Action</label>
+        <select class="form-control" name="status">
+          <option value="cancelled">Cancel this booking</option>
         </select>
+        <p style="font-size:11px;color:var(--muted);margin-top:5px">
+          Note: Returns are processed by handlers. Cancellations can be done here by admin.
+        </p>
       </div>
-      <div class="form-group"><label class="form-label">Admin Notes</label><textarea class="form-control" name="notes" id="rental-notes" rows="2" placeholder="Optional notes..."></textarea></div>
+      <div class="form-group">
+        <label class="form-label">Admin Notes</label>
+        <textarea class="form-control" name="notes" rows="2" placeholder="Reason for cancellation..."></textarea>
+      </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-outline" onclick="closeModal('modal-rental')">Cancel</button>
-        <button type="submit" name="act" value="update_payment" class="btn btn-blue" id="pay-btn">Mark Paid</button>
-        <button type="submit" class="btn btn-gold">Update Status</button>
+        <button type="button" class="btn btn-outline" onclick="closeModal('modal-status')">Close</button>
+        <button type="submit" class="btn btn-red">Cancel Booking</button>
       </div>
     </form>
   </div>
 </div>
 
+<style>
+.pager{display:flex;align-items:center;gap:5px;padding:12px 16px;border-top:1px solid var(--border)}
+.pager a,.pager .cur{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none;border:1px solid var(--border);color:var(--text2)}
+.pager a:hover{background:var(--gold-bg);border-color:var(--gold);color:var(--gold)}
+.pager .cur{background:var(--gold);border-color:var(--gold);color:#fff}
+</style>
 <script>
 function openModal(id)  { document.getElementById(id).classList.add('show'); }
 function closeModal(id) { document.getElementById(id).classList.remove('show'); }
-function openRental(r) {
-  document.getElementById('rental-id').value      = r.id;
-  document.getElementById('modal-order').textContent = r.order_code;
-  document.getElementById('rental-notes').value   = r.admin_notes || '';
-  const sel = document.getElementById('rental-status');
-  for(let o of sel.options) if(o.value === r.status) o.selected = true;
-  document.getElementById('rental-info').innerHTML =
-    `<b>${r.eq_icon} ${r.eq_name}</b> · ${r.days} day(s)<br>
-     Customer: ${r.first_name} ${r.last_name}<br>
-     Total: ₱${parseFloat(r.total_amount).toLocaleString()} · Discount: ${r.discount_pct}%`;
-  const payBtn = document.getElementById('pay-btn');
-  const pay = r.payment_status || 'paid';
-  payBtn.textContent = pay === 'paid' ? 'Mark Refunded' : 'Mark Paid';
-  payBtn.setAttribute('onclick', `document.querySelector('[name=act]').value='update_payment'; document.querySelector('[name=payment_status]')?.remove(); const i=document.createElement('input');i.type='hidden';i.name='payment_status';i.value='${pay==='paid'?'refunded':'paid'}';document.querySelector('#modal-rental form').appendChild(i);`);
-  openModal('modal-rental');
-}
 window.onclick = e => { if(e.target.classList.contains('modal-overlay')) e.target.classList.remove('show'); }
+function updateStatus(rid, code, status) {
+  document.getElementById('modal-rid').value = rid;
+  document.getElementById('modal-order-info').textContent = 'Order ' + code;
+  openModal('modal-status');
+}
 </script>
-
 <?php include 'includes/admin_layout_end.php'; ?>

@@ -6,170 +6,185 @@ $active_menu = 'id_verify';
 $msg = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $act    = $_POST['act'] ?? '';
-    $vid    = intval($_POST['verify_id'] ?? 0);
-    $uid    = intval($_POST['user_id']   ?? 0);
+    $act    = $_POST['act']       ?? '';
+    $vid    = intval($_POST['verify_id']  ?? 0);
+    $uid    = intval($_POST['user_id']    ?? 0);
     $notes  = $conn->real_escape_string($_POST['notes'] ?? '');
     $admin_id = $_SESSION['admin_id'];
 
     if ($act === 'approve') {
         $conn->query("UPDATE id_verifications SET status='approved', notes='$notes', reviewed_by=$admin_id, updated_at=NOW() WHERE id=$vid");
         $conn->query("UPDATE users SET id_verified=1, id_status='approved', id_reject_reason=NULL WHERE id=$uid");
-        $msg = "ID verification approved. Customer now gets 20% discount.";
+        $msg = "✅ ID approved. Customer can now book equipment and gets the applicable discount.";
     }
-    if ($act === 'reject') {
-        $conn->query("UPDATE id_verifications SET status='rejected', notes='$notes', reviewed_by=$admin_id, updated_at=NOW() WHERE id=$vid");
-        $conn->query("UPDATE users SET id_verified=0, id_status='rejected', id_reject_reason='$notes' WHERE id=$uid");
-        $msg = "ID verification rejected.";
+    if ($act === 'reject_no_discount') {
+        // ID is valid but not eligible for discount (e.g. regular gov ID submitted hoping for discount)
+        $reason = "ID type is not eligible for the 20% discount. Only Student ID, Senior Citizen ID, and PWD ID qualify. Your account is still active and you may borrow equipment. — $notes";
+        $conn->query("UPDATE id_verifications SET status='rejected', notes='".($conn->real_escape_string($reason))."', reviewed_by=$admin_id, updated_at=NOW() WHERE id=$vid");
+        $conn->query("UPDATE users SET id_verified=1, id_status='approved', id_reject_reason='".($conn->real_escape_string($reason))."' WHERE id=$uid");
+        // Still approve so they can borrow, just no discount
+        $msg = "ID approved for borrowing but no discount applied (not eligible ID type).";
     }
-    if ($act === 'escalate') {
-        $conn->query("UPDATE id_verifications SET status='escalated', notes='$notes', reviewed_by=$admin_id, updated_at=NOW() WHERE id=$vid");
-        $msg = "Case escalated for manual review.";
-    }
-    if ($act === 'override_type') {
-        $new_type = in_array($_POST['id_type'],['student','senior','pwd','regular'])?$_POST['id_type']:'regular';
-        $conn->query("UPDATE users SET id_type='$new_type', id_verified=1, id_status='approved', id_reject_reason=NULL WHERE id=$uid");
-        $conn->query("UPDATE id_verifications SET status='approved', notes='Override: type changed to $new_type. $notes', reviewed_by=$admin_id, updated_at=NOW() WHERE id=$vid");
-        $msg = "ID type overridden to ".ucfirst($new_type).".";
-    }
-    if ($act === 'add_manual') {
-        $uid2     = intval($_POST['user_id2']);
-        $id_type2 = in_array($_POST['id_type2'],['student','senior','pwd','regular'])?$_POST['id_type2']:'regular';
-        $conn->query("INSERT INTO id_verifications (user_id, id_type, status, reviewed_by) VALUES ($uid2,'$id_type2','approved',$admin_id) ON DUPLICATE KEY UPDATE id_type='$id_type2', status='approved', reviewed_by=$admin_id, updated_at=NOW()");
-        $conn->query("UPDATE users SET id_type='$id_type2', id_verified=1 WHERE id=$uid2");
-        $msg = "Manual ID verification added.";
+    if ($act === 'reject_invalid') {
+        // ID is invalid / cannot borrow
+        $reason = $notes ?: 'ID could not be verified. Please resubmit a clear photo of a valid ID.';
+        $conn->query("UPDATE id_verifications SET status='rejected', notes='".($conn->real_escape_string($reason))."', reviewed_by=$admin_id, updated_at=NOW() WHERE id=$vid");
+        $conn->query("UPDATE users SET id_verified=0, id_status='rejected', id_reject_reason='".($conn->real_escape_string($reason))."' WHERE id=$uid");
+        $msg = "❌ ID rejected. Customer cannot borrow equipment until they resubmit a valid ID.";
     }
 }
 
 $filter = $_GET['filter'] ?? 'pending';
-$safe_f = in_array($filter,['pending','approved','rejected','escalated','all'])?$filter:'pending';
+$safe_f = in_array($filter,['pending','approved','rejected','all'])?$filter:'pending';
 $sql = "SELECT v.*, u.first_name, u.last_name, u.email, u.id_type as current_id_type
         FROM id_verifications v JOIN users u ON v.user_id = u.id";
 if ($safe_f !== 'all') $sql .= " WHERE v.status='$safe_f'";
 $sql .= " ORDER BY v.created_at DESC";
-$verifications = $conn->query($sql)->fetch_all(MYSQLI_ASSOC);
-$users_list = $conn->query("SELECT id, first_name, last_name, email FROM users ORDER BY first_name")->fetch_all(MYSQLI_ASSOC);
+$page  = max(1, intval($_GET['p'] ?? 1));
+$limit = 15; $offset = ($page-1)*$limit;
+$total_v  = $conn->query(str_replace("SELECT v.*", "SELECT COUNT(*)", $sql))->fetch_row()[0];
+$total_pg = max(1, ceil($total_v/$limit));
+$verifications = $conn->query($sql." LIMIT $limit OFFSET $offset")->fetch_all(MYSQLI_ASSOC);
+
+$counts = [];
+foreach(['pending','approved','rejected','all'] as $s) {
+    $q = $s === 'all' ? "SELECT COUNT(*) FROM id_verifications" : "SELECT COUNT(*) FROM id_verifications WHERE status='$s'";
+    $counts[$s] = $conn->query($q)->fetch_row()[0];
+}
 
 include 'includes/admin_layout.php';
 ?>
 
-<?php if($msg): ?><div class="alert alert-success">✅ <?= htmlspecialchars($msg) ?></div><?php endif; ?>
+<?php if($msg): ?><div class="alert alert-success"><?= htmlspecialchars($msg) ?></div><?php endif; ?>
 
 <div class="page-head">
-  <div><div class="page-head-title">ID Verification</div><div class="page-head-sub">Review AI-detected IDs, approve, reject, or escalate</div></div>
-  <button class="btn btn-gold" onclick="openModal('modal-manual')">+ Manual Entry</button>
+  <div><div class="page-head-title">ID Verification</div><div class="page-head-sub">Review customer-submitted IDs — approve or reject with reason</div></div>
+</div>
+
+<!-- INFO BOX -->
+<div style="background:var(--gold-bg);border:1px solid #EDD8B0;border-radius:12px;padding:14px 18px;margin-bottom:18px;font-size:13px;color:#7A5C1E">
+  <strong>ℹ️ Rejection Types:</strong>
+  <span style="margin-left:8px">
+    <strong>Reject (No Discount)</strong> — ID is valid but not eligible for 20% off (e.g. regular gov't ID). Customer can still borrow.
+    &nbsp;·&nbsp;
+    <strong>Reject (Invalid)</strong> — ID cannot be verified. Customer <u>cannot borrow</u> until resubmission.
+  </span>
 </div>
 
 <div class="search-bar">
-  <div style="display:flex;gap:6px">
-    <?php foreach(['pending'=>'⏳ Pending','approved'=>'✅ Approved','rejected'=>'❌ Rejected','escalated'=>'🔺 Escalated','all'=>'All'] as $k=>$v): ?>
-    <a class="btn <?= $safe_f===$k?'btn-gold':'btn-outline' ?> btn-sm" href="admin_id_verify.php?filter=<?= $k ?>"><?= $v ?></a>
+  <div style="display:flex;gap:6px;flex-wrap:wrap">
+    <?php foreach(['pending'=>'⏳ Pending','approved'=>'✅ Approved','rejected'=>'❌ Rejected','all'=>'All'] as $k=>$v): ?>
+    <a class="btn <?= $safe_f===$k?'btn-gold':'btn-outline' ?> btn-sm" href="admin_id_verify.php?filter=<?= $k ?>">
+      <?= $v ?> <span style="background:rgba(0,0,0,.12);border-radius:10px;padding:1px 7px;margin-left:4px;font-size:10px"><?= $counts[$k] ?></span>
+    </a>
     <?php endforeach; ?>
   </div>
 </div>
 
 <div class="table-card">
   <table>
-    <thead><tr><th>Customer</th><th>Email</th><th>Submitted ID Type</th><th>Current Type</th><th>Status</th><th>Submitted</th><th>Notes</th><th>Actions</th></tr></thead>
+    <thead><tr><th>Customer</th><th>Email</th><th>ID Photo</th><th>Detected Type</th><th>AI Notes</th><th>Status</th><th>Submitted</th><th>Actions</th></tr></thead>
     <tbody>
       <?php foreach($verifications as $v): ?>
       <tr>
         <td style="font-weight:600"><?= htmlspecialchars($v['first_name'].' '.$v['last_name']) ?></td>
-        <td><?= htmlspecialchars($v['email']) ?></td>
-        <td><?php $icons=['student'=>'🎓','senior'=>'👴','pwd'=>'♿','regular'=>'🪪']; echo $icons[$v['id_type']].' '.ucfirst($v['id_type']); ?></td>
-        <td><?= $icons[$v['current_id_type']].' '.ucfirst($v['current_id_type']) ?></td>
-        <td><span class="status-badge s-<?= $v['status'] ?>"><?= ucfirst($v['status']) ?></span></td>
-        <td style="font-size:12px;color:var(--muted)"><?= date('M j, Y', strtotime($v['created_at'])) ?></td>
-        <td style="font-size:12px;color:var(--muted);max-width:140px"><?= $v['notes'] ? htmlspecialchars(substr($v['notes'],0,50)).'...' : '—' ?></td>
+        <td style="font-size:12px"><?= htmlspecialchars($v['email']) ?></td>
         <td>
-          <?php if($v['status'] === 'pending' || $v['status'] === 'escalated'): ?>
-          <button class="btn btn-outline btn-sm" onclick='openReview(<?= json_encode($v) ?>)'>Review</button>
+          <?php if($v['id_image'] && file_exists($v['id_image'])): ?>
+            <img src="<?= htmlspecialchars($v['id_image']) ?>" style="width:60px;height:44px;object-fit:cover;border-radius:6px;cursor:pointer;border:1px solid var(--border)"
+              onclick="window.open('<?= htmlspecialchars($v['id_image']) ?>','_blank')"/>
+          <?php else: ?><span style="color:var(--muted);font-size:12px">No photo</span><?php endif; ?>
+        </td>
+        <td><?php $icons=['student'=>'🎓','senior'=>'👴','pwd'=>'♿','regular'=>'🪪']; echo ($icons[$v['id_type']]??'🪪').' '.ucfirst($v['id_type']); ?></td>
+        <td style="font-size:11px;color:var(--muted);max-width:160px"><?= htmlspecialchars(substr($v['notes']??'—',0,80)) ?></td>
+        <td>
+          <?php $bs=['approved'=>'s-active','rejected'=>'s-cancelled','pending'=>'s-pending','escalated'=>'s-reviewed']; ?>
+          <span class="status-badge <?= $bs[$v['status']]??'s-pending' ?>"><?= ucfirst($v['status']) ?></span>
+        </td>
+        <td style="font-size:12px;color:var(--muted)"><?= date('M j, Y', strtotime($v['created_at'])) ?></td>
+        <td>
+          <?php if($v['status'] === 'pending'): ?>
+          <div class="btn-group" style="flex-direction:column;gap:5px">
+            <button class="btn btn-green btn-sm" onclick="reviewID(<?= $v['id'] ?>,<?= $v['user_id'] ?>,'approve','<?= htmlspecialchars(addslashes($v['first_name'].' '.$v['last_name'])) ?>')">✅ Approve</button>
+            <button class="btn btn-outline btn-sm" style="color:var(--orange);border-color:var(--orange)" onclick="reviewID(<?= $v['id'] ?>,<?= $v['user_id'] ?>,'reject_no_discount','<?= htmlspecialchars(addslashes($v['first_name'].' '.$v['last_name'])) ?>')">⚠️ No Discount</button>
+            <button class="btn btn-red btn-sm" onclick="reviewID(<?= $v['id'] ?>,<?= $v['user_id'] ?>,'reject_invalid','<?= htmlspecialchars(addslashes($v['first_name'].' '.$v['last_name'])) ?>')">❌ Invalid ID</button>
+          </div>
           <?php else: ?>
-          <button class="btn btn-outline btn-sm" onclick='openReview(<?= json_encode($v) ?>)'>Override</button>
+            <span style="font-size:11px;color:var(--muted)">Reviewed</span>
           <?php endif; ?>
         </td>
       </tr>
       <?php endforeach; ?>
-      <?php if(empty($verifications)): ?><tr class="empty-row"><td colspan="8">No <?= $safe_f !== 'all' ? $safe_f : '' ?> verifications found.</td></tr><?php endif; ?>
+      <?php if(empty($verifications)): ?><tr class="empty-row"><td colspan="8">No <?= $safe_f !== 'all'?$safe_f:'' ?> verifications.</td></tr><?php endif; ?>
     </tbody>
   </table>
+  <?php if($total_pg>1): ?>
+  <div class="pager">
+    <?php for($i=1;$i<=$total_pg;$i++): ?>
+      <?php if($i==1||$i==$total_pg||abs($i-$page)<=2): ?>
+        <a href="?filter=<?=$safe_f?>&p=<?=$i?>" <?=$i==$page?'class="cur"':''?>><?=$i?></a>
+      <?php elseif(abs($i-$page)==3): ?><span style="color:var(--muted);padding:0 4px;border:none">…</span><?php endif; ?>
+    <?php endfor; ?>
+  </div>
+  <?php endif; ?>
 </div>
 
 <!-- REVIEW MODAL -->
 <div class="modal-overlay" id="modal-review">
-  <div class="modal">
-    <div class="modal-header"><h3 class="modal-title">Review ID Verification</h3><button class="modal-close" onclick="closeModal('modal-review')">×</button></div>
-    <div style="background:var(--bg);border-radius:10px;padding:14px;margin-bottom:18px;font-size:13px" id="review-info"></div>
-    <form method="POST" id="review-form">
-      <input type="hidden" name="verify_id" id="rev-vid"/>
-      <input type="hidden" name="user_id"   id="rev-uid"/>
-      <div class="form-group"><label class="form-label">Override ID Type (optional)</label>
-        <select class="form-control" name="id_type" id="rev-idtype">
-          <option value="student">🎓 Student</option>
-          <option value="senior">👴 Senior Citizen</option>
-          <option value="pwd">♿ PWD</option>
-          <option value="regular">🪪 Regular</option>
-        </select>
+  <div class="modal" style="max-width:440px">
+    <div class="modal-header"><h3 class="modal-title" id="review-title">Review ID</h3><button class="modal-close" onclick="closeModal('modal-review')">×</button></div>
+    <form method="POST">
+      <input type="hidden" name="verify_id" id="rv-vid"/>
+      <input type="hidden" name="user_id"   id="rv-uid"/>
+      <input type="hidden" name="act"        id="rv-act"/>
+      <div class="modal-info" id="rv-info" style="margin-bottom:14px"></div>
+      <div class="form-group">
+        <label class="form-label">Notes / Reason <span id="rv-note-hint" style="font-weight:400;color:var(--muted);text-transform:none"></span></label>
+        <textarea class="form-control" name="notes" id="rv-notes" rows="3" placeholder="Optional notes..."></textarea>
       </div>
-      <div class="form-group"><label class="form-label">Notes</label><textarea class="form-control" name="notes" id="rev-notes" rows="2" placeholder="Add review notes..."></textarea></div>
       <div class="modal-footer">
         <button type="button" class="btn btn-outline" onclick="closeModal('modal-review')">Cancel</button>
-        <button type="submit" name="act" value="escalate" class="btn btn-blue">🔺 Escalate</button>
-        <button type="submit" name="act" value="reject"   class="btn btn-red">❌ Reject</button>
-        <button type="submit" name="act" value="override_type" class="btn btn-outline">Override Type</button>
-        <button type="submit" name="act" value="approve"  class="btn btn-green">✅ Approve</button>
+        <button type="submit" class="btn" id="rv-submit-btn">Confirm</button>
       </div>
     </form>
   </div>
 </div>
 
-<!-- MANUAL ENTRY MODAL -->
-<div class="modal-overlay" id="modal-manual">
-  <div class="modal">
-    <div class="modal-header"><h3 class="modal-title">Manual ID Entry</h3><button class="modal-close" onclick="closeModal('modal-manual')">×</button></div>
-    <form method="POST">
-      <input type="hidden" name="act" value="add_manual"/>
-      <div class="form-group"><label class="form-label">Customer</label>
-        <select class="form-control" name="user_id2" required>
-          <option value="">— Select customer —</option>
-          <?php foreach($users_list as $u): ?>
-          <option value="<?= $u['id'] ?>"><?= htmlspecialchars($u['first_name'].' '.$u['last_name'].' ('.$u['email'].')') ?></option>
-          <?php endforeach; ?>
-        </select>
-      </div>
-      <div class="form-group"><label class="form-label">ID Type</label>
-        <select class="form-control" name="id_type2">
-          <option value="student">🎓 Student</option>
-          <option value="senior">👴 Senior Citizen</option>
-          <option value="pwd">♿ PWD</option>
-          <option value="regular">🪪 Regular</option>
-        </select>
-      </div>
-      <div class="modal-footer"><button type="button" class="btn btn-outline" onclick="closeModal('modal-manual')">Cancel</button><button type="submit" class="btn btn-gold">Add & Approve</button></div>
-    </form>
-  </div>
-</div>
-
+<style>
+.pager{display:flex;align-items:center;gap:5px;padding:12px 16px;border-top:1px solid var(--border)}
+.pager a,.pager .cur{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none;border:1px solid var(--border);color:var(--text2)}
+.pager a:hover{background:var(--gold-bg);border-color:var(--gold);color:var(--gold)}
+.pager .cur{background:var(--gold);border-color:var(--gold);color:#fff}
+</style>
 <script>
 function openModal(id)  { document.getElementById(id).classList.add('show'); }
 function closeModal(id) { document.getElementById(id).classList.remove('show'); }
-function openReview(v) {
-  document.getElementById('rev-vid').value   = v.id;
-  document.getElementById('rev-uid').value   = v.user_id;
-  document.getElementById('rev-notes').value = v.notes || '';
-  const icons = {student:'🎓',senior:'👴',pwd:'♿',regular:'🪪'};
-  const imgHtml = v.id_image
-    ? `<div style="margin-top:12px"><p style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Uploaded ID Photo</p><img src="${v.id_image}" style="max-width:100%;max-height:220px;border-radius:10px;border:1px solid var(--border);object-fit:cover"/></div>`
-    : `<p style="margin-top:10px;font-size:12px;color:var(--muted)">⚠️ No ID image uploaded yet.</p>`;
-  document.getElementById('review-info').innerHTML =
-    `<b>${v.first_name} ${v.last_name}</b> — ${v.email}<br>
-     Submitted: ${icons[v.id_type]||'🪪'} <b>${v.id_type}</b> &nbsp;|&nbsp; Current: ${icons[v.current_id_type]||'🪪'} ${v.current_id_type}<br>
-     Status: <b>${v.status}</b>${imgHtml}`;
-  const sel = document.getElementById('rev-idtype');
-  for(let o of sel.options) if(o.value === v.id_type) o.selected = true;
+window.onclick = e => { if(e.target.classList.contains('modal-overlay')) e.target.classList.remove('show'); }
+
+function reviewID(vid, uid, act, name) {
+  document.getElementById('rv-vid').value = vid;
+  document.getElementById('rv-uid').value = uid;
+  document.getElementById('rv-act').value = act;
+
+  const titles = {
+    'approve':           '✅ Approve ID',
+    'reject_no_discount':'⚠️ Reject — No Discount',
+    'reject_invalid':    '❌ Reject — Invalid ID'
+  };
+  const infos = {
+    'approve':           name + "'s ID will be approved. They can borrow equipment and receive any applicable discount.",
+    'reject_no_discount': name + "'s ID will be marked approved for borrowing but NO discount will be applied (ID type not eligible).",
+    'reject_invalid':    name + "'s ID will be rejected. They CANNOT borrow equipment until they resubmit a valid ID."
+  };
+  const btnColors = {approve:'btn-green', reject_no_discount:'btn-orange', reject_invalid:'btn-red'};
+
+  document.getElementById('review-title').textContent = titles[act];
+  document.getElementById('rv-info').textContent = infos[act];
+  const btn = document.getElementById('rv-submit-btn');
+  btn.className = 'btn ' + (btnColors[act]||'btn-gold');
+  btn.textContent = titles[act];
+  document.getElementById('rv-notes').value = '';
   openModal('modal-review');
 }
-window.onclick = e => { if(e.target.classList.contains('modal-overlay')) e.target.classList.remove('show'); }
 </script>
-
 <?php include 'includes/admin_layout_end.php'; ?>

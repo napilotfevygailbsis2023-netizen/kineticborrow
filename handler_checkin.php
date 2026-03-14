@@ -22,8 +22,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['act'] ?? '') === 'checkin'
     } else {
         // Mark returned
         $conn->query("UPDATE rentals SET status='returned', checkin_by=$hid, checkin_at='$now', return_date='$today' WHERE id=$rid");
-        // Update equipment stock
+        // Restore equipment stock when returned
         $conn->query("UPDATE equipment SET stock=stock+1 WHERE id={$rental['equipment_id']}");
+        // Re-activate if was deactivated due to zero stock
+        $conn->query("UPDATE equipment SET is_active=1 WHERE id={$rental['equipment_id']} AND stock > 0");
         // Log condition
         $stmt = $conn->prepare("INSERT INTO condition_logs (rental_id, handler_id, type, condition_rating, notes) VALUES (?,?,'checkin',?,?)");
         $stmt->bind_param('iiss', $rid, $hid, $condition, $notes);

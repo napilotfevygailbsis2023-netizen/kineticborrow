@@ -34,46 +34,73 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['booking_error'] = 'id_required';
             header("Location: dashboard.php?page=browse"); exit();
         }
+        // Gate: max 3 active rentals
+        $active_count = $conn->query("SELECT COUNT(*) FROM rentals WHERE user_id=$user_id AND status='active'")->fetch_row()[0];
+        $cart_count   = count($_SESSION['cart']);
+        if (($active_count + $cart_count) >= 3) {
+            $_SESSION['booking_error'] = 'max_reached';
+            header("Location: dashboard.php?page=browse"); exit();
+        }
+        $eid = intval($_POST['eq_id']);
+        $eq  = $conn->query("SELECT * FROM equipment WHERE id=$eid AND is_active=1 LIMIT 1")->fetch_assoc();
+        if (!$eq) { header("Location: dashboard.php?page=browse"); exit(); }
+
+        // Check if already in cart, skip duplicate
+        $already = array_filter($_SESSION['cart'], fn($i) => $i['id'] === $eid);
+        if (!$already) {
+            $_SESSION['cart'][] = [
+                'id'          => $eq['id'],
+                'name'        => $eq['name'],
+                'icon'        => $eq['icon'] ?: '🏅',
+                'price'       => $eq['price_per_day'],
+                'days'        => 1,
+                'pickup_date' => null,
+                'return_date' => null,
+            ];
+        }
+        header("Location: dashboard.php?page=cart"); exit();
+    }
+
+    // SET DATES per cart item (done in cart page)
+    if ($act === 'set_dates') {
         $eid        = intval($_POST['eq_id']);
+        $today      = date('Y-m-d');
+        $min_pickup = date('Y-m-d', strtotime('+3 days')); // must be at least 3 days from today
         $pickup_raw = $_POST['pickup_date'] ?? '';
         $return_raw = $_POST['return_date'] ?? '';
-        $today      = date('Y-m-d');
-        $pickup     = ($pickup_raw >= $today) ? $pickup_raw : $today;
-        $days_raw   = max(1, (int)((strtotime($return_raw) - strtotime($pickup)) / 86400));
-        $days       = min(7, $days_raw);
-        $return     = date('Y-m-d', strtotime("$pickup +$days days"));
-
-        $eq = $conn->query("SELECT * FROM equipment WHERE id=$eid AND is_active=1 LIMIT 1")->fetch_assoc();
-        if (!$eq) { header("Location: dashboard.php?page=browse"); exit(); }
+        // pickup must be at least 3 days from now
+        $pickup = ($pickup_raw >= $min_pickup) ? $pickup_raw : $min_pickup;
+        $days   = max(1, min(3, (int)((strtotime($return_raw) - strtotime($pickup)) / 86400)));
+        $return = date('Y-m-d', strtotime("$pickup +$days days"));
 
         // Availability check
         $av = $conn->prepare("SELECT COUNT(*) as cnt FROM rentals WHERE equipment_id=? AND status='active' AND start_date <= ? AND end_date >= ?");
         $av->bind_param('iss', $eid, $return, $pickup); $av->execute();
         $booked = $av->get_result()->fetch_assoc()['cnt'];
-        if ($booked >= $eq['stock']) {
+        $eq_stock = $conn->query("SELECT stock FROM equipment WHERE id=$eid")->fetch_row()[0];
+        if ($booked >= $eq_stock) {
             $_SESSION['booking_error']      = 'unavailable';
-            $_SESSION['booking_error_eq']   = $eq['name'];
+            $_SESSION['booking_error_eq']   = $_SESSION['cart'][array_search($eid, array_column($_SESSION['cart'],'id'))]['name'] ?? 'Equipment';
             $_SESSION['booking_error_date'] = date('F j, Y', strtotime($pickup));
-            header("Location: dashboard.php?page=browse"); exit();
+            header("Location: dashboard.php?page=cart"); exit();
         }
 
-        $found = false;
-        foreach ($_SESSION['cart'] as &$item) {
-            if ($item['id'] === $eid) {
-                $item['days'] = $days; $item['pickup_date'] = $pickup; $item['return_date'] = $return;
-                $found = true; break;
+        foreach ($_SESSION['cart'] as $key => $item) {
+            if ((int)$item['id'] === $eid) {
+                $_SESSION['cart'][$key]['days']        = $days;
+                $_SESSION['cart'][$key]['pickup_date'] = $pickup;
+                $_SESSION['cart'][$key]['return_date'] = $return;
+                break;
             }
         }
-        if (!$found) {
-            $_SESSION['cart'][] = ['id'=>$eq['id'],'name'=>$eq['name'],'icon'=>$eq['icon'],
-                'price'=>$eq['price_per_day'],'days'=>$days,'pickup_date'=>$pickup,'return_date'=>$return];
-        }
+        session_write_close();
         header("Location: dashboard.php?page=cart"); exit();
     }
 
     if ($act === 'remove_cart') {
         $eid = intval($_POST['eq_id']);
-        $_SESSION['cart'] = array_values(array_filter($_SESSION['cart'], fn($i) => $i['id'] !== $eid));
+        $_SESSION['cart'] = array_values(array_filter($_SESSION['cart'], fn($i) => (int)$i['id'] !== $eid));
+        session_write_close();
         header("Location: dashboard.php?page=cart"); exit();
     }
 
@@ -97,12 +124,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($act === 'confirm_booking') {
+        // Check all items have dates set
+        foreach ($_SESSION['cart'] as $item) {
+            if (empty($item['pickup_date'])) {
+                $_SESSION['booking_error'] = 'no_dates';
+                header("Location: dashboard.php?page=cart"); exit();
+            }
+        }
         foreach ($_SESSION['cart'] as $item) {
             $disc  = ($user['id_status']==='approved' && in_array($user['id_type'],['student','senior','pwd'])) ? 20 : 0;
             $total = $item['price'] * $item['days'] * (1 - $disc/100);
             $code  = 'KB-' . strtoupper(substr(uniqid(), -4));
-            $start = $item['pickup_date'] ?? date('Y-m-d');
-            $end   = $item['return_date'] ?? date('Y-m-d', strtotime("+{$item['days']} days"));
+            $start = $item['pickup_date'];
+            $end   = $item['return_date'];
             $stmt  = $conn->prepare("INSERT INTO rentals (order_code,user_id,equipment_id,days,price_per_day,discount_pct,total_amount,start_date,end_date) VALUES (?,?,?,?,?,?,?,?,?)");
             $stmt->bind_param('siiiidiss', $code, $user_id, $item['id'], $item['days'], $item['price'], $disc, $total, $start, $end);
             $stmt->execute();
@@ -113,6 +147,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header("Location: dashboard.php?page=history&booked=1"); exit();
     }
 }
+
+// Active rental count for limit display
+$active_rental_count = $conn->query("SELECT COUNT(*) FROM rentals WHERE user_id=$user_id AND status='active'")->fetch_row()[0];
 
 // Fetch rental history
 $rentals = $conn->query("
@@ -216,6 +253,16 @@ $id_labels = ['student'=>'Student ID','senior'=>'Senior Citizen ID','pwd'=>'PWD 
     .gold-btn:hover{background:var(--gold-lt);transform:translateY(-1px);box-shadow:0 4px 12px rgba(196,127,43,.3);}
     .ghost-btn{background:transparent;color:var(--text2);border:1px solid var(--border);padding:10px 22px;border-radius:10px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;transition:all .2s;width:100%;margin-top:8px;}
     .ghost-btn:hover{border-color:var(--gold);color:var(--gold);background:var(--gold-bg);}
+
+    /* EQUIPMENT INFO MODAL */
+    .eq-overlay{position:fixed;inset:0;background:rgba(0,0,0,.52);z-index:1000;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px);padding:16px;}
+    .eq-overlay.show{display:flex;}
+    .eq-modal{background:#fff;border-radius:22px;width:540px;max-width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 28px 80px rgba(0,0,0,.22);position:relative;animation:slideUp .25s ease;}
+    .eq-modal-img{width:100%;max-height:260px;object-fit:cover;border-radius:22px 22px 0 0;display:block;}
+    .eq-modal-img-placeholder{background:var(--gold-bg);height:200px;display:flex;align-items:center;justify-content:center;font-size:72px;border-radius:22px 22px 0 0;}
+    .eq-modal-body{padding:24px 28px 28px;}
+    .eq-modal-close{position:absolute;top:14px;right:16px;background:rgba(0,0,0,.35);border:none;width:32px;height:32px;border-radius:50%;font-size:16px;cursor:pointer;color:#fff;display:flex;align-items:center;justify-content:center;transition:background .2s;}
+    .eq-modal-close:hover{background:rgba(0,0,0,.6);}
 
     /* BOOKING MODAL */
     .bk-overlay{position:fixed;inset:0;background:rgba(0,0,0,.48);z-index:1000;display:none;align-items:center;justify-content:center;backdrop-filter:blur(3px);}
@@ -411,27 +458,64 @@ $id_labels = ['student'=>'Student ID','senior'=>'Senior Citizen ID','pwd'=>'PWD 
     </div>
   </form>
 
+  <?php
+  $cart_eq_count = count($_SESSION['cart'] ?? []);
+  $total_eq_count = ($active_rental_count ?? 0) + $cart_eq_count;
+  if ($total_eq_count >= 3):
+  ?>
+  <div style="background:#FFF2F2;border:1.5px solid #FFAAAA;border-radius:14px;padding:16px 20px;margin-bottom:16px;display:flex;align-items:center;gap:14px">
+    <span style="font-size:28px">🚫</span>
+    <div>
+      <div style="font-weight:700;font-size:14px;color:var(--red)">Rental Limit Reached (3/3)</div>
+      <div style="font-size:13px;color:var(--red);margin-top:2px">You have <?= $total_eq_count ?> active/pending rental<?= $total_eq_count>1?'s':'' ?>. Return equipment or remove cart items to book more.</div>
+    </div>
+    <a href="dashboard.php?page=history" style="background:var(--red);color:#fff;padding:9px 18px;border-radius:8px;text-decoration:none;font-size:13px;font-weight:600;white-space:nowrap;margin-left:auto">View Rentals →</a>
+  </div>
+  <?php endif; ?>
+
   <div class="eq-grid">
     <?php foreach($equipment as $eq): ?>
     <?php $tl=$eq['tag']??''; $tc=$tl==='Popular'?'tag-pop':($tl==='Student Deal'?'tag-std':($tl==='Limited'?'tag-lmt':($tl?'tag-wkd':''))); ?>
+    <?php $eq_json = htmlspecialchars(json_encode([
+        'id'    => $eq['id'],
+        'name'  => $eq['name'],
+        'cat'   => $eq['category'],
+        'price' => $eq['price_per_day'],
+        'stock' => $eq['stock'],
+        'image' => $eq['image'] ?? '',
+        'desc'  => $eq['description'] ?? '',
+        'rating'=> $eq['rating'],
+        'count' => $eq['review_count'],
+        'tag'   => $tl,
+    ]), ENT_QUOTES); ?>
     <div class="card">
-      <div class="card-img">
-        <?= $eq['icon'] ?>
+      <div class="card-img" style="<?= !empty($eq['image']) ? 'padding:0;overflow:hidden;' : '' ?>;cursor:pointer" onclick="openEqModal(<?= $eq_json ?>)">
+        <?php if(!empty($eq['image'])): ?>
+          <img src="<?= htmlspecialchars($eq['image']) ?>"
+               style="width:100%;min-height:160px;max-height:200px;object-fit:cover;display:block"
+               onerror="this.parentElement.style.padding='28px 0';this.parentElement.innerHTML='<span style=\'font-size:52px\'>🏅</span>'"/>
+        <?php else: ?>
+          <span style="font-size:52px">🏅</span>
+        <?php endif; ?>
         <?php if($eq['stock']<=2&&$eq['stock']>0): ?><span class="card-stock low">Only <?= $eq['stock'] ?> left</span><?php endif; ?>
         <?php if($eq['stock']<=0): ?><span class="card-stock low">Out of Stock</span><?php endif; ?>
       </div>
       <div class="card-body">
         <?php if($tl): ?><span class="tag <?= $tc ?>"><?= htmlspecialchars($tl) ?></span><?php endif; ?>
-        <p class="card-name"><?= htmlspecialchars($eq['name']) ?></p>
+        <p class="card-name" style="cursor:pointer" onclick="openEqModal(<?= $eq_json ?>)"><?= htmlspecialchars($eq['name']) ?></p>
         <p class="card-cat"><?= htmlspecialchars($eq['category']) ?></p>
         <div class="card-foot">
           <span class="card-price">₱<?= number_format($eq['price_per_day'],0) ?><span>/day</span></span>
           <span class="card-rating">⭐ <?= $eq['rating'] ?> (<?= $eq['review_count'] ?>)</span>
         </div>
         <?php if($eq['stock']>0): ?>
-        <button class="gold-btn" onclick="openBookModal(<?= $eq['id'] ?>, '<?= addslashes($eq['name']) ?>', <?= $eq['price_per_day'] ?>, '<?= $eq['icon'] ?>')">📅 Book Now</button>
+        <form method="POST" action="dashboard.php?page=browse">
+          <input type="hidden" name="act" value="add_cart"/>
+          <input type="hidden" name="eq_id" value="<?= $eq['id'] ?>"/>
+          <button type="submit" class="gold-btn">🛒 Add to Cart</button>
+        </form>
         <?php else: ?>
-        <button class="gold-btn" disabled style="opacity:.5;cursor:not-allowed">Out of Stock</button>
+        <button class="gold-btn" disabled style="opacity:.5;cursor:not-allowed">Not Available</button>
         <?php endif; ?>
       </div>
     </div>
@@ -440,6 +524,44 @@ $id_labels = ['student'=>'Student ID','senior'=>'Senior Citizen ID','pwd'=>'PWD 
     <div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">🔍</div><p>No equipment found.</p></div>
     <?php endif; ?>
   </div>
+
+<!-- ══ EQUIPMENT INFO MODAL ══ -->
+<div class="eq-overlay" id="eq-overlay" onclick="if(event.target===this)closeEqModal()">
+  <div class="eq-modal" id="eq-modal">
+    <button class="eq-modal-close" onclick="closeEqModal()">✕</button>
+    <div id="eq-modal-img-wrap"></div>
+    <div class="eq-modal-body">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:6px">
+        <div>
+          <p id="eq-modal-name" style="font-family:'Playfair Display',serif;font-size:22px;font-weight:800;color:var(--text);margin-bottom:2px"></p>
+          <p id="eq-modal-cat" style="font-size:13px;color:var(--muted)"></p>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <p id="eq-modal-price" style="font-family:'Playfair Display',serif;font-size:24px;font-weight:800;color:var(--gold)"></p>
+          <p id="eq-modal-rating" style="font-size:12px;color:var(--muted);margin-top:2px"></p>
+        </div>
+      </div>
+
+      <div id="eq-modal-tag-wrap" style="margin-bottom:10px"></div>
+
+      <div id="eq-modal-desc" style="font-size:14px;color:var(--text2);line-height:1.7;margin-bottom:18px;padding:14px;background:var(--bg);border-radius:10px;border:1px solid var(--border)"></div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span id="eq-modal-stock-dot" style="width:10px;height:10px;border-radius:50%;display:inline-block"></span>
+          <span id="eq-modal-stock-txt" style="font-size:13px;font-weight:600"></span>
+        </div>
+        <span style="font-size:12px;color:var(--muted)">Max rental: <strong>3 days</strong></span>
+      </div>
+
+      <form method="POST" action="dashboard.php?page=browse" id="eq-modal-form">
+        <input type="hidden" name="act" value="add_cart"/>
+        <input type="hidden" name="eq_id" id="eq-modal-eq-id"/>
+        <button type="submit" id="eq-modal-btn" class="gold-btn" style="font-size:15px;padding:14px">🛒 Add to Cart</button>
+      </form>
+    </div>
+  </div>
+</div>
 
 <!-- ══ CART ══ -->
 <?php elseif($page==='cart'): ?>
@@ -452,24 +574,63 @@ $id_labels = ['student'=>'Student ID','senior'=>'Senior Citizen ID','pwd'=>'PWD 
   <div class="cart-layout">
     <div>
       <div class="cart-items">
-        <?php foreach($_SESSION['cart'] as $item): ?>
-        <div class="cart-card">
-          <div class="cart-emoji"><?= $item['icon'] ?></div>
-          <div class="cart-info">
-            <p class="cart-name"><?= htmlspecialchars($item['name']) ?></p>
-            <p class="cart-rate">₱<?= number_format($item['price'],0) ?>/day</p>
-            <?php if(!empty($item['pickup_date'])): ?>
-            <p class="cart-dates">📅 Pick-up: <?= date('M j, Y', strtotime($item['pickup_date'])) ?></p>
-            <p class="cart-dates">🔁 Return: <?= date('M j, Y', strtotime($item['return_date'])) ?></p>
-            <?php endif; ?>
-            <span class="cart-days"><?= $item['days'] ?> day<?= $item['days']!==1?'s':'' ?></span>
+        <?php
+        $today_dt = date('Y-m-d');
+        $min_pickup_dt = date('Y-m-d', strtotime('+3 days'));
+        foreach($_SESSION['cart'] as $item):
+          $has_dates = !empty($item['pickup_date']);
+        ?>
+        <div class="cart-card" style="flex-direction:column;align-items:stretch;gap:0">
+          <div style="display:flex;align-items:center;gap:14px;margin-bottom:<?=$has_dates?'12':'0'?>px">
+            <div class="cart-emoji"><?= $item['icon'] ?></div>
+            <div class="cart-info" style="flex:1">
+              <p class="cart-name"><?= htmlspecialchars($item['name']) ?></p>
+              <p class="cart-rate">₱<?= number_format($item['price'],0) ?>/day</p>
+              <?php if($has_dates): ?>
+              <p class="cart-dates" style="color:var(--green)">✅ <?= date('M j', strtotime($item['pickup_date'])) ?> → <?= date('M j, Y', strtotime($item['return_date'])) ?> · <?= $item['days'] ?> day<?= $item['days']!=1?'s':'' ?></p>
+              <?php else: ?>
+              <p class="cart-dates" style="color:var(--red);font-weight:600">📅 Pick a date below to continue</p>
+              <?php endif; ?>
+            </div>
+            <div style="text-align:right">
+              <?php if($has_dates): ?><span class="cart-sub">₱<?= number_format($item['price']*$item['days'],0) ?></span><?php endif; ?>
+              <form method="POST" action="dashboard.php?page=cart" style="display:block;margin-top:4px">
+                <input type="hidden" name="act" value="remove_cart"/>
+                <input type="hidden" name="eq_id" value="<?= $item['id'] ?>"/>
+                <button type="submit" class="remove-btn">×</button>
+              </form>
+            </div>
           </div>
-          <span class="cart-sub">₱<?= number_format($item['price']*$item['days'],0) ?></span>
-          <form method="POST" action="dashboard.php?page=cart" style="display:inline">
-            <input type="hidden" name="act" value="remove_cart"/>
-            <input type="hidden" name="eq_id" value="<?= $item['id'] ?>"/>
-            <button type="submit" class="remove-btn">×</button>
-          </form>
+          <!-- Date picker for this item -->
+          <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:8px" <?= !$has_dates ? 'data-needs-dates="1"' : '' ?>>
+            <form method="POST" action="dashboard.php?page=cart">
+              <input type="hidden" name="act" value="set_dates"/>
+              <input type="hidden" name="eq_id" value="<?= $item['id'] ?>"/>
+              <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end">
+                <div>
+                  <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:5px">📅 Pick-up Date</label>
+                  <input type="date" name="pickup_date" id="pu-<?= $item['id'] ?>"
+                    value="<?= $item['pickup_date'] ?: date('Y-m-d', strtotime('+3 days')) ?>"
+                    min="<?= date('Y-m-d', strtotime('+3 days')) ?>"
+                    style="width:100%;border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;font-family:'DM Sans',sans-serif;font-size:13px;background:#fff"
+                    onchange="cartDateUpdate(<?= $item['id'] ?>)"/>
+                </div>
+                <div>
+                  <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:5px">🔁 Return Date</label>
+                  <input type="date" name="return_date" id="rt-<?= $item['id'] ?>"
+                    value="<?= $item['return_date'] ?: date('Y-m-d', strtotime('+4 days')) ?>"
+                    min="<?= date('Y-m-d', strtotime(($item['pickup_date'] ?? date('Y-m-d', strtotime('+3 days'))).' +1 day')) ?>"
+                    max="<?= date('Y-m-d', strtotime(($item['pickup_date'] ?? date('Y-m-d', strtotime('+3 days'))).' +3 days')) ?>"
+                    style="width:100%;border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;font-family:'DM Sans',sans-serif;font-size:13px;background:#fff"
+                    onchange="cartDateUpdate(<?= $item['id'] ?>)"/>
+                </div>
+                <button type="submit" style="background:var(--gold);color:#fff;border:none;border-radius:8px;padding:9px 14px;font-weight:600;font-size:13px;cursor:pointer;white-space:nowrap"><?= $has_dates?'✓ Update':'Set Dates' ?></button>
+              </div>
+              <div id="cart-preview-<?= $item['id'] ?>" style="font-size:12px;color:var(--muted);margin-top:7px">
+                ℹ️ Earliest pick-up: <strong><?= date('M j', strtotime('+3 days')) ?></strong> (3-day lead time) · Max rental: <strong>3 days</strong>
+              </div>
+            </form>
+          </div>
         </div>
         <?php endforeach; ?>
       </div>
@@ -497,9 +658,12 @@ $id_labels = ['student'=>'Student ID','senior'=>'Senior Citizen ID','pwd'=>'PWD 
           <span class="summary-total-val">₱<?= number_format($total,0) ?></span>
         </div>
       </div>
-      <form method="POST" action="dashboard.php?page=cart">
+      <div id="dates-warning" style="display:none;background:#FDECEA;color:#C0392B;border:1px solid #F5C6C2;border-radius:10px;padding:10px 14px;font-size:13px;font-weight:500;margin-bottom:10px">
+        ⚠️ Please set pick-up dates for all items first.
+      </div>
+      <form method="POST" action="dashboard.php?page=cart" id="booking-form">
         <input type="hidden" name="act" value="confirm_booking"/>
-        <button type="submit" class="gold-btn">Confirm Booking →</button>
+        <button type="submit" id="confirm-btn" class="gold-btn" onclick="return checkDates()">Confirm Booking →</button>
       </form>
       <a href="dashboard.php?page=browse" class="ghost-btn" style="display:block;text-align:center;text-decoration:none">Continue Browsing</a>
       <p class="summary-note">Equipment will be prepared for pick-up on your selected date.</p>
@@ -682,42 +846,17 @@ $id_labels = ['student'=>'Student ID','senior'=>'Senior Citizen ID','pwd'=>'PWD 
 <?php endif; ?>
 </div>
 
-<!-- ══ BOOKING DATE MODAL ══ -->
-<div class="bk-overlay" id="bk-overlay" onclick="if(event.target===this)closeBk()">
-  <div class="bk-modal">
-    <button class="bk-close" onclick="closeBk()">✕</button>
-    <div class="bk-header">
-      <div class="bk-icon" id="bk-icon">🏋️</div>
-      <div>
-        <div class="bk-eq-name" id="bk-name">Book Equipment</div>
-        <div class="bk-eq-price" id="bk-price-lbl"></div>
-      </div>
-    </div>
-    <div class="bk-info-bar">⏱️ <span>Maximum rental period is <strong>7 days</strong>. Return date adjusts automatically.</span></div>
-    <form method="POST" action="dashboard.php?page=cart" id="bk-form">
-      <input type="hidden" name="act" value="add_cart"/>
-      <input type="hidden" name="eq_id" id="bk-eq-id"/>
-      <div class="bk-date-row">
-        <div class="bk-field">
-          <label>📅 Pick-up Date</label>
-          <input class="bk-input" type="date" name="pickup_date" id="bk-pickup" required onchange="bkUpdate()"/>
-        </div>
-        <div class="bk-field">
-          <label>🔁 Return Date</label>
-          <input class="bk-input" type="date" name="return_date" id="bk-return" required onchange="bkUpdate()"/>
-        </div>
-      </div>
-      <div class="bk-summary" id="bk-summary" style="display:none">
-        <div class="bk-sum-row"><span style="color:var(--muted)">Duration</span><span id="bk-dur">—</span></div>
-        <div class="bk-sum-row"><span style="color:var(--muted)">Rate</span><span id="bk-rt">—</span></div>
-        <div class="bk-sum-row"><span>Estimated Total</span><span id="bk-tot">—</span></div>
-      </div>
-      <button type="submit" class="bk-btn">Add to Cart →</button>
-    </form>
-  </div>
-</div>
+
 
 <!-- ══ TOAST ALERTS ══ -->
+<div class="toast toast-error <?= (($_SESSION['booking_error']??'')=='max_reached')?'show':'' ?>" id="toast-maxreached">
+  <span class="toast-icon">🚫</span>
+  <div style="flex:1">
+    <div class="toast-title">Rental Limit Reached (3/3)</div>
+    <div class="toast-msg">You already have 3 active rentals. Please return equipment before booking more.</div>
+  </div>
+  <button class="toast-x" onclick="this.parentElement.classList.remove('show')">✕</button>
+</div>
 <div class="toast toast-error <?= (($_SESSION['booking_error']??'')==='unavailable')?'show':'' ?>" id="toast-unavail">
   <span class="toast-icon">🚫</span>
   <div style="flex:1">
@@ -736,51 +875,168 @@ $id_labels = ['student'=>'Student ID','senior'=>'Senior Citizen ID','pwd'=>'PWD 
   <button class="toast-x" onclick="this.parentElement.classList.remove('show')">✕</button>
 </div>
 
+<div class="toast toast-warn <?= (($_SESSION['booking_error']??'')==='no_dates')?'show':'' ?>" id="toast-nodates">
+  <span class="toast-icon">📅</span>
+  <div style="flex:1">
+    <div class="toast-title">Pick-up Date Required</div>
+    <div class="toast-msg">Please set pick-up and return dates for all items in your cart before confirming your booking.</div>
+  </div>
+  <button class="toast-x" onclick="this.parentElement.classList.remove('show')">✕</button>
+</div>
+
 <?php unset($_SESSION['booking_error'],$_SESSION['booking_error_eq'],$_SESSION['booking_error_date']); ?>
 
 <script>
-let bkPrice = 0;
-
-function openBookModal(id, name, price, icon) {
-  document.getElementById('bk-eq-id').value = id;
-  document.getElementById('bk-name').textContent = name;
-  document.getElementById('bk-icon').textContent  = icon;
-  document.getElementById('bk-price-lbl').textContent = '₱' + price.toLocaleString() + ' / day';
-  bkPrice = price;
-  const today    = new Date().toISOString().split('T')[0];
-  const tomorrow = new Date(Date.now()+86400000).toISOString().split('T')[0];
-  const pu = document.getElementById('bk-pickup');
-  const rt = document.getElementById('bk-return');
-  pu.min = today; pu.value = today;
-  rt.min = tomorrow; rt.value = tomorrow;
-  document.getElementById('bk-summary').style.display = 'none';
-  bkUpdate();
-  document.getElementById('bk-overlay').classList.add('show');
+// Check all cart items have dates before confirming booking
+function checkDates() {
+  const missingItems = document.querySelectorAll('[data-needs-dates="1"]');
+  if (missingItems.length > 0) {
+    // Scroll to first missing item and highlight it
+    missingItems[0].scrollIntoView({behavior:'smooth', block:'center'});
+    missingItems[0].style.border = '2px solid var(--red)';
+    missingItems[0].style.borderRadius = '10px';
+    setTimeout(() => { missingItems[0].style.border = ''; }, 2500);
+    // Show inline warning on summary
+    const warn = document.getElementById('dates-warning');
+    if (warn) { warn.style.display = 'block'; setTimeout(()=>warn.style.display='none', 4000); }
+    return false;
+  }
+  return true;
 }
 
-function closeBk() { document.getElementById('bk-overlay').classList.remove('show'); }
+// Equipment info modal
+function openEqModal(eq) {
+  // Image
+  const imgWrap = document.getElementById('eq-modal-img-wrap');
+  if (eq.image) {
+    imgWrap.innerHTML = '<img src="'+eq.image+'" class="eq-modal-img" onerror="this.parentElement.innerHTML=\'<div class=eq-modal-img-placeholder>🏅</div>\'">';
+  } else {
+    imgWrap.innerHTML = '<div class="eq-modal-img-placeholder">🏅</div>';
+  }
+  document.getElementById('eq-modal-name').textContent  = eq.name;
+  document.getElementById('eq-modal-cat').textContent   = eq.cat;
+  document.getElementById('eq-modal-price').textContent = '₱' + Number(eq.price).toLocaleString() + '/day';
+  document.getElementById('eq-modal-rating').textContent = '⭐ ' + eq.rating + ' (' + eq.count + ' reviews)';
+  document.getElementById('eq-modal-eq-id').value = eq.id;
 
-function bkUpdate() {
-  const pu = document.getElementById('bk-pickup');
-  const rt = document.getElementById('bk-return');
-  if (!pu.value) return;
-  // Min return = pickup + 1
-  const minRet = new Date(new Date(pu.value).getTime()+86400000).toISOString().split('T')[0];
-  // Max return = pickup + 7
-  const maxRet = new Date(new Date(pu.value).getTime()+7*86400000).toISOString().split('T')[0];
-  rt.min = minRet; rt.max = maxRet;
+  // Description
+  const descEl = document.getElementById('eq-modal-desc');
+  descEl.textContent = eq.desc || 'No description provided.';
+
+  // Tag
+  const tagWrap = document.getElementById('eq-modal-tag-wrap');
+  tagWrap.innerHTML = eq.tag ? '<span class="tag tag-pop">'+eq.tag+'</span>' : '';
+
+  // Stock
+  const dot = document.getElementById('eq-modal-stock-dot');
+  const txt = document.getElementById('eq-modal-stock-txt');
+  const btn = document.getElementById('eq-modal-btn');
+  if (eq.stock <= 0) {
+    dot.style.background = '#C0392B'; txt.textContent = 'Not Available'; txt.style.color = '#C0392B';
+    btn.disabled = true; btn.style.opacity = '.5'; btn.style.cursor = 'not-allowed'; btn.textContent = 'Not Available';
+  } else if (eq.stock <= 2) {
+    dot.style.background = '#E07C35'; txt.textContent = 'Only ' + eq.stock + ' left'; txt.style.color = '#E07C35';
+    btn.disabled = false; btn.style.opacity = '1'; btn.style.cursor = 'pointer'; btn.textContent = '🛒 Add to Cart';
+  } else {
+    dot.style.background = '#2E8B57'; txt.textContent = eq.stock + ' in stock'; txt.style.color = '#2E8B57';
+    btn.disabled = false; btn.style.opacity = '1'; btn.style.cursor = 'pointer'; btn.textContent = '🛒 Add to Cart';
+  }
+
+  document.getElementById('eq-overlay').classList.add('show');
+  document.body.style.overflow = 'hidden';
+}
+function closeEqModal() {
+  document.getElementById('eq-overlay').classList.remove('show');
+  document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => { if(e.key==='Escape') closeEqModal(); });
+
+// Cart date picker live update
+function cartDateUpdate(eqId) {
+  const pu = document.getElementById('pu-' + eqId);
+  const rt = document.getElementById('rt-' + eqId);
+  if (!pu || !rt || !pu.value) return;
+
+  const puDate = new Date(pu.value + 'T00:00:00');
+  const minRet = new Date(puDate.getTime() + 86400000).toISOString().split('T')[0];
+  const maxRet = new Date(puDate.getTime() + 3*86400000).toISOString().split('T')[0];
+
+  rt.min = minRet;
+  rt.max = maxRet;
   if (!rt.value || rt.value <= pu.value) rt.value = minRet;
   if (rt.value > maxRet) rt.value = maxRet;
-  const days  = Math.max(1, Math.round((new Date(rt.value)-new Date(pu.value))/86400000));
-  const total = days * bkPrice;
-  document.getElementById('bk-dur').textContent = days + ' day' + (days!==1?'s':'');
-  document.getElementById('bk-rt').textContent  = '₱' + bkPrice.toLocaleString() + ' × ' + days;
-  document.getElementById('bk-tot').textContent = '₱' + total.toLocaleString();
-  document.getElementById('bk-summary').style.display = 'block';
+
+  const days = Math.max(1, Math.round((new Date(rt.value) - puDate) / 86400000));
+  const prev = document.getElementById('cart-preview-' + eqId);
+  if (prev) prev.innerHTML = '📅 <strong>' + days + ' day' + (days>1?'s':'') + '</strong> · Pick-up: ' + pu.value + ' · Return: ' + rt.value;
 }
+
+// Set min pickup date = today+3 on load for all pickers
+document.addEventListener('DOMContentLoaded', function() {
+  const today = new Date();
+  const minPickup = new Date(today.getTime() + 3*86400000).toISOString().split('T')[0];
+  document.querySelectorAll('input[id^="pu-"]').forEach(pu => {
+    pu.min = minPickup;
+    if (!pu.value || pu.value < minPickup) {
+      pu.value = minPickup;
+      const eqId = pu.id.replace('pu-', '');
+      cartDateUpdate(eqId);
+    }
+  });
+});
 
 // Auto-dismiss toasts after 7s
 document.querySelectorAll('.toast.show').forEach(t => setTimeout(()=>t.classList.remove('show'), 7000));
 </script>
+
+<!-- ══ FOOTER ══ -->
+<footer style="background:#1C1916;color:#fff;padding:40px 40px 24px;margin-top:60px">
+  <div style="max-width:1100px;margin:0 auto">
+    <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:40px;margin-bottom:32px">
+      <div>
+        <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:800;margin-bottom:8px">Kinetic<span style="color:var(--gold,#C47F2B)">Borrow</span></div>
+        <p style="font-size:13px;color:#AAA;line-height:1.7;max-width:280px">Premium sports equipment rental for students, athletes, and sports enthusiasts at University of Caloocan City.</p>
+        <div style="margin-top:14px;display:flex;gap:10px">
+          <span style="background:#333;border-radius:6px;padding:6px 10px;font-size:18px">📘</span>
+          <span style="background:#333;border-radius:6px;padding:6px 10px;font-size:18px">📸</span>
+          <span style="background:#333;border-radius:6px;padding:6px 10px;font-size:18px">📧</span>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#888;margin-bottom:14px">Browse</div>
+        <div style="display:flex;flex-direction:column;gap:8px;font-size:13px;color:#CCC">
+          <a href="dashboard.php?page=browse" style="color:#CCC;text-decoration:none;transition:color .18s" onmouseover="this.style.color='#C47F2B'" onmouseout="this.style.color='#CCC'">All Equipment</a>
+          <a href="dashboard.php?page=browse&cat=Cycling" style="color:#CCC;text-decoration:none" onmouseover="this.style.color='#C47F2B'" onmouseout="this.style.color='#CCC'">Cycling</a>
+          <a href="dashboard.php?page=browse&cat=Team+Sports" style="color:#CCC;text-decoration:none" onmouseover="this.style.color='#C47F2B'" onmouseout="this.style.color='#CCC'">Team Sports</a>
+          <a href="dashboard.php?page=browse&cat=Racket+Sports" style="color:#CCC;text-decoration:none" onmouseover="this.style.color='#C47F2B'" onmouseout="this.style.color='#CCC'">Racket Sports</a>
+          <a href="dashboard.php?page=browse&cat=Outdoor" style="color:#CCC;text-decoration:none" onmouseover="this.style.color='#C47F2B'" onmouseout="this.style.color='#CCC'">Outdoor</a>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#888;margin-bottom:14px">Account</div>
+        <div style="display:flex;flex-direction:column;gap:8px;font-size:13px">
+          <a href="dashboard.php?page=history" style="color:#CCC;text-decoration:none" onmouseover="this.style.color='#C47F2B'" onmouseout="this.style.color='#CCC'">My Rentals</a>
+          <a href="dashboard.php?page=cart" style="color:#CCC;text-decoration:none" onmouseover="this.style.color='#C47F2B'" onmouseout="this.style.color='#CCC'">My Cart</a>
+          <a href="dashboard.php?page=profile" style="color:#CCC;text-decoration:none" onmouseover="this.style.color='#C47F2B'" onmouseout="this.style.color='#CCC'">Profile & ID</a>
+          <a href="logout.php" style="color:#CCC;text-decoration:none" onmouseover="this.style.color='#C47F2B'" onmouseout="this.style.color='#CCC'">Log Out</a>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#888;margin-bottom:14px">Info</div>
+        <div style="display:flex;flex-direction:column;gap:8px;font-size:13px;color:#CCC">
+          <span>📍 University of Caloocan City</span>
+          <span>🏫 Computer Studies Dept.</span>
+          <span>🕐 Mon–Fri · 8AM – 5PM</span>
+          <span>📱 BS Information Systems</span>
+        </div>
+      </div>
+    </div>
+    <div style="border-top:1px solid #333;padding-top:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+      <p style="font-size:12px;color:#666">© 2025 KineticBorrow · University of Caloocan City · BS Information Systems</p>
+      <p style="font-size:12px;color:#555">Made with ❤️ by Agarano · Marianito · Napilot · Reyes · Tejada</p>
+    </div>
+  </div>
+</footer>
+
 </body>
 </html>

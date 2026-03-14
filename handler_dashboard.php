@@ -5,6 +5,7 @@ requireHandler();
 $active_menu = 'dashboard';
 $hid = $_SESSION['handler_id'];
 $today = date('Y-m-d');
+$page_title = 'Dashboard';
 
 // Today's pickups (active rentals starting today or overdue)
 $pickups = $conn->query("
@@ -30,14 +31,14 @@ $returns = $conn->query("
     ORDER BY r.end_date ASC
 ")->fetch_all(MYSQLI_ASSOC);
 
-// Upcoming (next 3 days)
+// Upcoming (next 30 days)
 $upcoming = $conn->query("
     SELECT r.*, u.first_name, u.last_name, e.name as eq_name, e.icon as eq_icon
     FROM rentals r
     JOIN users u ON r.user_id = u.id
     JOIN equipment e ON r.equipment_id = e.id
     WHERE r.status = 'active' AND r.checkout_by IS NULL
-      AND r.start_date > '$today' AND r.start_date <= DATE_ADD('$today', INTERVAL 3 DAY)
+      AND r.start_date > '$today' AND r.start_date <= DATE_ADD('$today', INTERVAL 30 DAY)
     ORDER BY r.start_date ASC
 ")->fetch_all(MYSQLI_ASSOC);
 
@@ -50,6 +51,9 @@ include 'includes/handler_layout.php';
 ?>
 
 <!-- STAT CARDS -->
+<div style="margin-bottom:8px">
+  <h2 style="font-family:'Playfair Display',serif;font-size:22px;font-weight:800;color:var(--text);margin:0 0 16px 0">Dashboard</h2>
+</div>
 <div class="stat-grid">
   <div class="stat-card">
     <div class="stat-top"><span class="stat-icon">📋</span><span class="stat-badge badge-orange">Today</span></div>
@@ -139,9 +143,9 @@ include 'includes/handler_layout.php';
     </table>
   </div>
 
-  <!-- UPCOMING (3 DAYS) -->
+  <!-- UPCOMING (30 DAYS) -->
   <div class="table-card">
-    <div class="table-header"><span class="table-title">📅 Upcoming (Next 3 Days)</span></div>
+    <div class="table-header"><span class="table-title">📅 Upcoming (Next 30 Days)</span></div>
     <table>
       <thead><tr><th>Order</th><th>Customer</th><th>Equipment</th><th>Pick-up</th></tr></thead>
       <tbody>
