@@ -16,9 +16,15 @@ $role_label = $role_labels[$admin['role']] ?? ucfirst($admin['role']);
 include 'includes/admin_layout.php';
 ?>
 
-<div class="page-head">
-  <div><div class="page-head-title">My Profile</div><div class="page-head-sub">Your admin account information</div></div>
+<div style="margin-bottom:24px;display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+  <div>
+    <div style="font-family:'Playfair Display',serif;font-size:26px;font-weight:800;color:var(--text);">My Profile</div>
+    <div style="font-size:12px;color:var(--muted);margin-top:3px;">Your admin account information</div>
+  </div>
 </div>
+
+
+
 
 <div style="display:grid;grid-template-columns:300px 1fr;gap:20px;align-items:start">
   <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px 24px;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.05)">

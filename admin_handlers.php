@@ -68,13 +68,18 @@ $handlers = $conn->query("
 include 'includes/admin_layout.php';
 ?>
 
+<div style="margin-bottom:24px;display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+  <div>
+    <div style="font-family:'Playfair Display',serif;font-size:26px;font-weight:800;color:var(--text);">Handler Accounts</div>
+    <div style="font-size:12px;color:var(--muted);margin-top:3px;">Register and manage equipment handler accounts</div>
+  </div>
+</div>
+
+
 <?php if($msg): ?><div class="alert alert-success">✅ <?= htmlspecialchars($msg) ?></div><?php endif; ?>
 <?php if($err):  ?><div class="alert alert-error">❌ <?= htmlspecialchars($err) ?></div><?php endif; ?>
 
-<div class="page-head">
-  <div><div class="page-head-title">Handler Accounts</div><div class="page-head-sub">Register and manage equipment handler accounts</div></div>
-  <button class="btn btn-gold" onclick="openModal('modal-add')">+ Register Handler</button>
-</div>
+<div style="display:flex;justify-content:flex-end;margin-bottom:16px"><button class="btn btn-gold" onclick="openModal('modal-add')">+ Register Handler</button></div>
 
 <div class="table-card">
   <table>

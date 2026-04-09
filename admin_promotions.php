@@ -5,28 +5,32 @@ requireAdmin();
 $active_menu = 'promotions';
 $msg = '';
 
+// Add weekend_only column if not exists
+$conn->query("ALTER TABLE promotions ADD COLUMN IF NOT EXISTS weekend_only TINYINT(1) DEFAULT 0");
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $act = $_POST['act'] ?? '';
 
     if ($act === 'add' || $act === 'edit') {
-        $title      = $conn->real_escape_string($_POST['title']);
-        $code       = strtoupper($conn->real_escape_string($_POST['code']));
-        $type       = in_array($_POST['type'],['percentage','fixed'])?$_POST['type']:'percentage';
-        $value      = floatval($_POST['value']);
-        $min_days   = intval($_POST['min_days']);
-        $start      = $conn->real_escape_string($_POST['start_date']);
-        $end        = $conn->real_escape_string($_POST['end_date']);
-        $is_active  = isset($_POST['is_active']) ? 1 : 0;
+        $title        = $conn->real_escape_string($_POST['title']);
+        $code         = strtoupper($conn->real_escape_string($_POST['code']));
+        $type         = in_array($_POST['type'],['percentage','fixed'])?$_POST['type']:'percentage';
+        $value        = floatval($_POST['value']);
+        $min_days     = intval($_POST['min_days']);
+        $start        = $conn->real_escape_string($_POST['start_date']);
+        $end          = $conn->real_escape_string($_POST['end_date']);
+        $is_active    = isset($_POST['is_active']) ? 1 : 0;
+        $weekend_only = isset($_POST['weekend_only']) ? 1 : 0;
 
         if ($act === 'add') {
-            $stmt = $conn->prepare("INSERT INTO promotions (title,code,type,value,min_days,start_date,end_date,is_active) VALUES (?,?,?,?,?,?,?,?)");
-            $stmt->bind_param('sssdiisi',$title,$code,$type,$value,$min_days,$start,$end,$is_active);
+            $stmt = $conn->prepare("INSERT INTO promotions (title,code,type,value,min_days,start_date,end_date,is_active,weekend_only) VALUES (?,?,?,?,?,?,?,?,?)");
+            $stmt->bind_param('sssdiisii',$title,$code,$type,$value,$min_days,$start,$end,$is_active,$weekend_only);
             if ($stmt->execute()) $msg = "Promotion '$title' created.";
             else $msg = "Error: code may already exist.";
         } else {
             $id = intval($_POST['id']);
-            $stmt = $conn->prepare("UPDATE promotions SET title=?,code=?,type=?,value=?,min_days=?,start_date=?,end_date=?,is_active=? WHERE id=?");
-            $stmt->bind_param('sssdiisii',$title,$code,$type,$value,$min_days,$start,$end,$is_active,$id);
+            $stmt = $conn->prepare("UPDATE promotions SET title=?,code=?,type=?,value=?,min_days=?,start_date=?,end_date=?,is_active=?,weekend_only=? WHERE id=?");
+            $stmt->bind_param('sssdiisiii',$title,$code,$type,$value,$min_days,$start,$end,$is_active,$weekend_only,$id);
             $stmt->execute();
             $msg = "Promotion updated.";
         }
@@ -49,19 +53,25 @@ $promos = $conn->query("SELECT * FROM promotions ORDER BY created_at DESC")->fet
 include 'includes/admin_layout.php';
 ?>
 
+<div style="margin-bottom:24px;display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+  <div>
+    <div style="font-family:'Playfair Display',serif;font-size:26px;font-weight:800;color:var(--text);">Promotions & Campaigns</div>
+    <div style="font-size:12px;color:var(--muted);margin-top:3px;">Create and manage discount codes and deals</div>
+  </div>
+</div>
+
+
 <?php if($msg): ?><div class="alert alert-success">✅ <?= htmlspecialchars($msg) ?></div><?php endif; ?>
 
-<div class="page-head">
-  <div><div class="page-head-title">Promotions & Campaigns</div><div class="page-head-sub">Create and manage discount codes, seasonal deals, and loyalty rewards</div></div>
-  <button class="btn btn-gold" onclick="openModal('modal-add')">+ New Promotion</button>
-</div>
+<div style="display:flex;justify-content:flex-end;margin-bottom:16px"><button class="btn btn-gold" onclick="openModal('modal-add')">+ New Promotion</button></div>
 
 <div class="table-card">
   <table>
-    <thead><tr><th>Title</th><th>Code</th><th>Type</th><th>Value</th><th>Min Days</th><th>Valid Period</th><th>Used</th><th>Status</th><th>Actions</th></tr></thead>
+    <thead><tr><th>Title</th><th>Code</th><th>Type</th><th>Value</th><th>Min Days</th><th>Valid Period</th><th>Weekend Only</th><th>Used</th><th>Status</th><th>Actions</th></tr></thead>
     <tbody>
       <?php foreach($promos as $p): ?>
       <?php $expired = strtotime($p['end_date']) < time(); ?>
+      <?php $is_weekend_active = ($p['weekend_only'] ?? 0) && !in_array(date('N'), [6,7]); ?>
       <tr>
         <td style="font-weight:600"><?= htmlspecialchars($p['title']) ?></td>
         <td><code style="background:var(--gold-bg);color:var(--gold);padding:3px 8px;border-radius:5px;font-weight:700"><?= htmlspecialchars($p['code']) ?></code></td>
@@ -69,6 +79,14 @@ include 'includes/admin_layout.php';
         <td style="font-weight:600;color:var(--gold)"><?= $p['type']==='percentage' ? $p['value'].'%' : '₱'.number_format($p['value'],0) ?></td>
         <td><?= $p['min_days'] ?> day<?= $p['min_days']>1?'s':'' ?></td>
         <td style="font-size:12px;color:var(--muted)"><?= date('M j', strtotime($p['start_date'])) ?> – <?= date('M j, Y', strtotime($p['end_date'])) ?></td>
+        <td>
+          <?php if($p['weekend_only'] ?? 0): ?>
+            <span class="status-badge" style="background:#F3EFFD;color:#7C3AED;border:1px solid #C4B5FD;">📅 Weekends</span>
+            <?php if($is_weekend_active): ?><div style="font-size:10px;color:var(--muted);margin-top:3px;">Not today (weekday)</div><?php endif; ?>
+          <?php else: ?>
+            <span style="font-size:12px;color:var(--muted)">All days</span>
+          <?php endif; ?>
+        </td>
         <td><?= $p['usage_count'] ?> times</td>
         <td>
           <?php if($expired): ?>
@@ -122,6 +140,7 @@ include 'includes/admin_layout.php';
         <div class="form-group"><label class="form-label">End Date</label><input class="form-control" name="end_date" type="date" required/></div>
       </div>
       <div class="form-group"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px"><input type="checkbox" name="is_active" checked/> Active immediately</label></div>
+      <div class="form-group"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px"><input type="checkbox" name="weekend_only"/> 📅 Weekend only (Sat & Sun)</label></div>
       <div class="modal-footer"><button type="button" class="btn btn-outline" onclick="closeModal('modal-add')">Cancel</button><button type="submit" class="btn btn-gold">Create Promotion</button></div>
     </form>
   </div>
@@ -150,6 +169,7 @@ include 'includes/admin_layout.php';
         <div class="form-group"><label class="form-label">End Date</label><input class="form-control" name="end_date" id="edit-end" type="date"/></div>
       </div>
       <div class="form-group"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px"><input type="checkbox" name="is_active" id="edit-active"/> Active</label></div>
+      <div class="form-group"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px"><input type="checkbox" name="weekend_only" id="edit-weekend"/> 📅 Weekend only (Sat & Sun)</label></div>
       <div class="modal-footer"><button type="button" class="btn btn-outline" onclick="closeModal('modal-edit')">Cancel</button><button type="submit" class="btn btn-gold">Save Changes</button></div>
     </form>
   </div>
@@ -166,7 +186,8 @@ function editPromo(p) {
   document.getElementById('edit-min').value   = p.min_days;
   document.getElementById('edit-start').value = p.start_date;
   document.getElementById('edit-end').value   = p.end_date;
-  document.getElementById('edit-active').checked = p.is_active == 1;
+  document.getElementById('edit-active').checked  = p.is_active == 1;
+  document.getElementById('edit-weekend').checked = p.weekend_only == 1;
   const sel = document.getElementById('edit-type');
   for(let o of sel.options) if(o.value === p.type) o.selected = true;
   openModal('modal-edit');

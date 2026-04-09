@@ -39,7 +39,6 @@ if ($file['size'] > $max_size) {
     header('Location: dashboard.php?page=profile'); exit();
 }
 
-// ── SAVE FILE ────────────────────────────────────────────────────
 $upload_dir = 'uploads/ids/';
 if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
 $ext      = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
@@ -52,7 +51,6 @@ if (!move_uploaded_file($file['tmp_name'], $filepath)) {
     header('Location: dashboard.php?page=profile'); exit();
 }
 
-// ── GEMINI API CALL ───────────────────────────────────────────────
 $ai_result          = null;
 $fallback_to_manual = false;
 
@@ -117,7 +115,6 @@ if (!empty(GEMINI_API_KEY) && function_exists('curl_init')) {
     $fallback_to_manual = true;
 }
 
-// ── DECIDE OUTCOME ────────────────────────────────────────────────
 if ($fallback_to_manual || !$ai_result) {
     $id_type       = 'regular';
     $new_status    = 'pending';
@@ -149,11 +146,9 @@ if ($fallback_to_manual || !$ai_result) {
     }
 }
 
-// ── DELETE OLD ID IMAGE ───────────────────────────────────────────
 $old = $conn->query("SELECT id_image FROM users WHERE id=$user_id")->fetch_row()[0] ?? null;
 if ($old && $old !== $filepath && file_exists($old)) @unlink($old);
 
-// ── UPDATE DATABASE ───────────────────────────────────────────────
 $stmt = $conn->prepare("UPDATE users SET id_type=?, id_image=?, id_status=?, id_verified=?, id_reject_reason=? WHERE id=?");
 $verified = ($new_status === 'approved') ? 1 : 0;
 $stmt->bind_param('sssisi', $id_type, $filepath, $new_status, $verified, $reject_reason, $user_id);
@@ -174,7 +169,6 @@ $stmt2->execute();
 $updated = $conn->query("SELECT * FROM users WHERE id=$user_id")->fetch_assoc();
 $_SESSION['user'] = $updated;
 
-// ── RESPOND ───────────────────────────────────────────────────────
 if ($new_status === 'rejected') {
     $_SESSION['id_upload_error'] = '❌ ' . htmlspecialchars($reject_reason ?? 'Please resubmit a clearer photo of your ID.');
     $_SESSION['id_upload_msg']   = '';

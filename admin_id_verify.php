@@ -55,11 +55,17 @@ foreach(['pending','approved','rejected','all'] as $s) {
 include 'includes/admin_layout.php';
 ?>
 
+<div style="margin-bottom:24px;display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+  <div>
+    <div style="font-family:'Playfair Display',serif;font-size:26px;font-weight:800;color:var(--text);">ID Verification</div>
+    <div style="font-size:12px;color:var(--muted);margin-top:3px;">Review customer-submitted IDs — approve or reject</div>
+  </div>
+</div>
+
+
 <?php if($msg): ?><div class="alert alert-success"><?= htmlspecialchars($msg) ?></div><?php endif; ?>
 
-<div class="page-head">
-  <div><div class="page-head-title">ID Verification</div><div class="page-head-sub">Review customer-submitted IDs — approve or reject with reason</div></div>
-</div>
+
 
 <!-- INFO BOX -->
 <div style="background:var(--gold-bg);border:1px solid #EDD8B0;border-radius:12px;padding:14px 18px;margin-bottom:18px;font-size:13px;color:#7A5C1E">

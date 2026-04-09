@@ -33,7 +33,7 @@ if ($filter === 'verified') $where[] = "u.id_verified=1";
 if ($where) $sql .= " WHERE ".implode(" AND ",$where);
 $sql .= " GROUP BY u.id ORDER BY u.created_at DESC";
 $page  = max(1, intval($_GET['p'] ?? 1));
-$limit = 15; $offset = ($page-1)*$limit;
+$limit = 10; $offset = ($page-1)*$limit;
 $total_c  = $conn->query("SELECT COUNT(DISTINCT u.id) FROM users u".($where?" WHERE ".implode(" AND ",$where):""))->fetch_row()[0];
 $total_pg = max(1, ceil($total_c/$limit));
 $customers = $conn->query($sql." LIMIT $limit OFFSET $offset")->fetch_all(MYSQLI_ASSOC);
@@ -41,11 +41,17 @@ $customers = $conn->query($sql." LIMIT $limit OFFSET $offset")->fetch_all(MYSQLI
 include 'includes/admin_layout.php';
 ?>
 
+<div style="margin-bottom:24px;display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+  <div>
+    <div style="font-family:'Playfair Display',serif;font-size:26px;font-weight:800;color:var(--text);">Customer Accounts</div>
+    <div style="font-size:12px;color:var(--muted);margin-top:3px;">View customer info and manage account status</div>
+  </div>
+</div>
+
+
 <?php if($msg): ?><div class="alert alert-success">✅ <?= htmlspecialchars($msg) ?></div><?php endif; ?>
 
-<div class="page-head">
-  <div><div class="page-head-title">Customer Accounts</div><div class="page-head-sub">View customer info and manage account status</div></div>
-</div>
+
 
 <div class="search-bar">
   <form method="GET" style="display:contents">
@@ -62,16 +68,25 @@ include 'includes/admin_layout.php';
 
 <div class="table-card">
   <table>
-    <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>ID Type</th><th>ID Status</th><th>Rentals</th><th>Points</th><th>Account Status</th><th>Action</th></tr></thead>
+    <thead><tr><th>Photo</th><th>Name</th><th>Contact</th><th>ID Type</th><th>ID Status</th><th>Rentals</th><th>Points</th><th>Account Status</th><th>Action</th></tr></thead>
     <tbody>
       <?php foreach($customers as $c): ?>
       <tr>
         <td>
+          <?php if(!empty($c['avatar'])): ?>
+            <img src="<?= htmlspecialchars($c['avatar']) ?>" style="width:36px;height:36px;border-radius:50%;object-fit:cover;border:2px solid var(--border)"/>
+          <?php else: ?>
+            <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--gold),#8B5E1A);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff;"><?= strtoupper(substr($c['first_name'],0,1)) ?></div>
+          <?php endif; ?>
+        </td>
+        <td>
           <div style="font-weight:600"><?= htmlspecialchars($c['first_name'].' '.$c['last_name']) ?></div>
           <div style="font-size:11px;color:var(--muted)">Joined <?= date('M j, Y', strtotime($c['created_at'])) ?></div>
         </td>
-        <td><?= htmlspecialchars($c['email']) ?></td>
-        <td><?= htmlspecialchars($c['phone']) ?></td>
+        <td>
+          <div style="font-size:12px"><?= htmlspecialchars($c['email']) ?></div>
+          <div style="font-size:12px;color:var(--muted)"><?= htmlspecialchars($c['phone'] ?: '—') ?></div>
+        </td>
         <td><?php $icons=['student'=>'🎓','senior'=>'👴','pwd'=>'♿','regular'=>'🪪']; echo ($icons[$c['id_type']]??'🪪').' '.ucfirst($c['id_type']); ?></td>
         <td>
           <?php

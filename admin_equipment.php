@@ -108,7 +108,7 @@ $avail_f = $_GET['avail'] ?? '';
 $sort_f  = in_array($_GET['sort']??'',['price_asc','price_desc','stock_asc','stock_desc']) ? $_GET['sort'] : 'priority';
 $search_f = $conn->real_escape_string($_GET['sq'] ?? '');
 $pg = max(1, intval($_GET['pg'] ?? 1));
-$per_page = 15;
+$per_page = 5;
 
 $sort_map = ['price_asc'=>'price_per_day ASC','price_desc'=>'price_per_day DESC','stock_asc'=>'stock ASC','stock_desc'=>'stock DESC',
              'priority'=>'FIELD(IF(stock=0,"none",IF(stock<=5,"low","ok")),"none","low","ok"), name ASC'];
@@ -144,12 +144,18 @@ function fqs($extra=[]) {
 include 'includes/admin_layout.php';
 ?>
 
+<div style="margin-bottom:24px;display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+  <div>
+    <div style="font-family:'Playfair Display',serif;font-size:26px;font-weight:800;color:var(--text);">Equipment Management</div>
+    <div style="font-size:12px;color:var(--muted);margin-top:3px;">Manage listings, stock, images, and availability</div>
+  </div>
+</div>
+
+
 <?php if($msg): ?><div class="alert alert-success">✅ <?= htmlspecialchars($msg) ?></div><?php endif; ?>
 <?php if($err): ?><div class="alert alert-error">❌ <?= htmlspecialchars($err) ?></div><?php endif; ?>
 
-<div class="page-head">
-  <div><div class="page-head-title">Equipment Management</div><div class="page-head-sub">Manage listings, stock, images, and availability</div></div>
-</div>
+
 
 <!-- TABS -->
 <div style="display:flex;border-bottom:2px solid var(--border);margin-bottom:20px">

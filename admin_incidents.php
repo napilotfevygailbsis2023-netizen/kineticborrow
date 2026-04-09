@@ -38,11 +38,17 @@ $resolved_count = $conn->query("SELECT COUNT(*) FROM incident_reports WHERE stat
 include 'includes/admin_layout.php';
 ?>
 
+<div style="margin-bottom:24px;display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+  <div>
+    <div style="font-family:'Playfair Display',serif;font-size:26px;font-weight:800;color:var(--text);">Incident Reports</div>
+    <div style="font-size:12px;color:var(--muted);margin-top:3px;">Review and resolve handler-submitted equipment incidents</div>
+  </div>
+</div>
+
+
 <?php if($msg): ?><div class="alert alert-success">✅ <?= htmlspecialchars($msg) ?></div><?php endif; ?>
 
-<div class="page-head">
-  <div><div class="page-head-title">Incident Reports</div><div class="page-head-sub">Review and resolve handler-submitted equipment incidents</div></div>
-</div>
+
 
 <!-- MINI STATS -->
 <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:22px">

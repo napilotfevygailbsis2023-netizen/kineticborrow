@@ -191,6 +191,9 @@ $menu_label = $active_menu ?? '';
     <a class="nav-item <?= $menu_label==='incidents'?'active':'' ?>" href="handler_incidents.php">
       <span class="nav-icon">🚨</span> Incident Reports
     </a>
+    <a class="nav-item <?= $menu_label==='chat'?'active':'' ?>" href="handler_chat.php">
+      <span class="nav-icon">💬</span> Messages
+    </a>
     <a class="nav-item <?= $menu_label==='blocklist'?'active':'' ?>" href="handler_blocklist.php">
       <span class="nav-icon">🚫</span> Blocklist (View Only)
     </a>
@@ -201,11 +204,8 @@ $menu_label = $active_menu ?? '';
 </aside>
 
 <div class="main">
-  <div class="topbar">
-    <span class="topbar-title"><?= ucfirst(str_replace('_',' ',$menu_label==='dashboard'?'Daily Queue':$menu_label)) ?></span>
-    <div class="topbar-right">
-      <span class="topbar-date"><?= date('l, F j, Y') ?></span>
-      <span class="topbar-badge">🔧 Handler</span>
-    </div>
+  <div style="display:flex;justify-content:flex-end;align-items:center;gap:12px;padding:14px 28px 0 28px;">
+    <span style="font-size:12px;color:var(--muted);"><?= date('l, F j, Y') ?></span>
+    <span style="background:var(--teal-bg);color:var(--teal);border:1px solid #B0D8DB;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600;">🔧 Handler</span>
   </div>
   <div class="content">

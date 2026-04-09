@@ -67,10 +67,16 @@ $month_rentals = $conn->query("
 include 'includes/admin_layout.php';
 ?>
 
+<div style="margin-bottom:24px;display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+  <div>
+    <div style="font-family:'Playfair Display',serif;font-size:26px;font-weight:800;color:var(--text);">Reports & Revenue</div>
+    <div style="font-size:12px;color:var(--muted);margin-top:3px;">Rental and revenue summaries, payment status, discount analytics</div>
+  </div>
+</div>
+
+
 <!-- FILTERS -->
-<div class="page-head">
-  <div><div class="page-head-title">Reports & Revenue</div><div class="page-head-sub">Rental and revenue summaries, payment status, discount analytics</div></div>
-  <form method="GET" style="display:flex;gap:8px;align-items:center">
+<div style="display:flex;justify-content:flex-end;margin-bottom:16px"><form method="GET" style="display:flex;gap:8px;align-items:center">
     <select class="form-control" name="month" style="width:auto">
       <?php for($m=1;$m<=12;$m++): ?><option value="<?=$m?>" <?=$m==$month?'selected':''?>><?=date('F',mktime(0,0,0,$m,1))?></option><?php endfor; ?>
     </select>
@@ -78,8 +84,7 @@ include 'includes/admin_layout.php';
       <?php for($y=date('Y');$y>=2024;$y--): ?><option value="<?=$y?>" <?=$y==$year?'selected':''?>><?=$y?></option><?php endfor; ?>
     </select>
     <button type="submit" class="btn btn-gold">Filter</button>
-  </form>
-</div>
+  </form></div>
 
 <!-- TOP STAT CARDS -->
 <div class="stat-grid" style="margin-bottom:20px">

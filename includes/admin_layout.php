@@ -207,11 +207,11 @@ $menu_label = $active_menu ?? '';
     <a class="nav-item <?= $menu_label==='reports'?'active':'' ?>" href="admin_reports.php">
       <span class="nav-icon">📈</span> Reports
     </a>
+    <a class="nav-item <?= $menu_label==='chat'?'active':'' ?>" href="admin_chat.php">
+      <span class="nav-icon">💬</span> Messages
+    </a>
   </nav>
   <div class="sidebar-footer">
-    <a href="admin_profile.php" style="display:flex;align-items:center;gap:8px;color:#888;font-size:13px;text-decoration:none;margin-bottom:10px;transition:color .18s" onmouseover="this.style.color='#C47F2B'" onmouseout="this.style.color='#888'">
-      <span>👤</span> My Profile
-    </a>
     <a class="logout-link" href="admin_logout.php">
       <span>🚪</span> Log Out
     </a>
@@ -220,11 +220,8 @@ $menu_label = $active_menu ?? '';
 
 <!-- MAIN WRAPPER -->
 <div class="main">
-  <div class="topbar">
-    <span class="topbar-title"><?= ucfirst(str_replace('_',' ',$menu_label)) ?></span>
-    <div class="topbar-right">
-      <span class="topbar-date"><?= date('l, F j, Y') ?></span>
-      <a href="index.php" target="_blank" style="font-size:12px;color:var(--muted);text-decoration:none;">🔗 View Site</a>
-    </div>
+  <div style="display:flex;justify-content:flex-end;align-items:center;gap:16px;padding:14px 32px 0 32px;">
+    <span style="font-size:12px;color:var(--muted);"><?= date('l, F j, Y') ?></span>
+    <a href="index.php" target="_blank" style="font-size:12px;color:var(--muted);text-decoration:none;">🔗 View Site</a>
   </div>
   <div class="content">

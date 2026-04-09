@@ -146,6 +146,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['cart'] = [];
         header("Location: dashboard.php?page=history&booked=1"); exit();
     }
+
+    // ── CANCEL BOOKING ───────────────────────────────────────────
+    if ($act === 'cancel_booking') {
+        $rid    = intval($_POST['rental_id'] ?? 0);
+        $reason = trim($conn->real_escape_string($_POST['cancel_reason'] ?? ''));
+
+        // Verify this rental belongs to this user and is still active & not yet checked out
+        $rental = $conn->query("
+            SELECT * FROM rentals
+            WHERE id=$rid AND user_id=$user_id AND status='active' AND checkout_by IS NULL
+            LIMIT 1
+        ")->fetch_assoc();
+
+        if ($rental) {
+            $conn->query("UPDATE rentals SET status='cancelled', admin_notes='Customer cancelled: $reason' WHERE id=$rid");
+            // Restore loyalty points that were awarded at booking
+            $pts_to_remove = intval($rental['total_amount'] / 10);
+            $conn->query("UPDATE users SET loyalty_pts = GREATEST(0, loyalty_pts - $pts_to_remove) WHERE id=$user_id");
+            $_SESSION['cancel_success'] = "Order {$rental['order_code']} has been cancelled.";
+        } else {
+            $_SESSION['cancel_error'] = "This booking cannot be cancelled. It may have already been picked up or processed.";
+        }
+        header("Location: dashboard.php?page=history"); exit();
+    }
 }
 
 // Active rental count for limit display
@@ -199,7 +223,7 @@ $id_labels = ['student'=>'Student ID','senior'=>'Senior Citizen ID','pwd'=>'PWD 
     .logout-btn{border:1px solid var(--border);color:var(--muted);padding:5px 12px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:12px;transition:all .18s;text-decoration:none;display:inline-block;background:none;}
     .logout-btn:hover{border-color:var(--red);color:var(--red);}
 
-    .container{max-width:1100px;margin:0 auto;padding:32px 24px;}
+    .container{max-width:1400px;margin:0 auto;padding:32px 32px;}
     .page-title{font-family:'Playfair Display',serif;font-size:28px;font-weight:800;margin-bottom:6px;}
     .page-sub{font-size:13px;color:var(--muted);margin-bottom:24px;}
 
@@ -231,17 +255,21 @@ $id_labels = ['student'=>'Student ID','senior'=>'Senior Citizen ID','pwd'=>'PWD 
     .pill:hover,.pill.active{background:var(--gold);border-color:var(--gold);color:#fff;}
 
     /* CARDS */
-    .eq-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:18px;}
-    .card{background:#fff;border:1px solid var(--border);border-radius:16px;overflow:hidden;transition:all .25s;box-shadow:0 2px 8px rgba(0,0,0,.05);}
+    .eq-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;}
+    @media(max-width:600px){.eq-grid{grid-template-columns:repeat(2,1fr);}}
+    .card{background:#fff;border:1px solid var(--border);border-radius:16px;overflow:hidden;transition:all .25s;box-shadow:0 2px 8px rgba(0,0,0,.05);cursor:pointer;}
     .card:hover{border-color:var(--gold);transform:translateY(-4px);box-shadow:0 12px 32px rgba(196,127,43,.14);}
-    .card-img{background:var(--gold-bg);padding:28px 0;text-align:center;font-size:52px;border-bottom:1px solid #EDD8B0;position:relative;}
+    .card-img{background:#FDF8F2;height:190px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;}
+    .card-img img{width:100%;height:190px;object-fit:cover;display:block;transition:transform .3s;}
+    .card:hover .card-img img{transform:scale(1.06);}
+    .card-img-emoji{font-size:64px;}
     .card-stock{position:absolute;top:10px;right:10px;background:#fff;border:1px solid var(--border);border-radius:20px;padding:2px 10px;font-size:11px;font-weight:600;color:var(--text2);}
     .card-stock.low{color:var(--red);border-color:#F5C6C2;background:var(--red-bg);}
-    .card-body{padding:16px;}
-    .card-name{font-family:'Playfair Display',serif;font-size:17px;font-weight:700;margin-bottom:3px;}
+    .card-body{padding:14px 14px 16px;}
+    .card-name{font-family:'Playfair Display',serif;font-size:16px;font-weight:700;margin-bottom:2px;line-height:1.2;}
     .card-cat{font-size:12px;color:var(--muted);margin-bottom:10px;}
     .card-foot{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
-    .card-price{font-family:'Playfair Display',serif;font-size:22px;color:var(--gold);font-weight:700;}
+    .card-price{font-family:'Playfair Display',serif;font-size:20px;color:var(--gold);font-weight:700;}
     .card-price span{font-family:'DM Sans',sans-serif;font-size:12px;color:var(--muted);}
     .card-rating{font-size:12px;color:var(--muted);}
     .tag{font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:3px 8px;border-radius:4px;margin-bottom:8px;display:inline-block;}
@@ -489,13 +517,13 @@ $id_labels = ['student'=>'Student ID','senior'=>'Senior Citizen ID','pwd'=>'PWD 
         'tag'   => $tl,
     ]), ENT_QUOTES); ?>
     <div class="card">
-      <div class="card-img" style="<?= !empty($eq['image']) ? 'padding:0;overflow:hidden;' : '' ?>;cursor:pointer" onclick="openEqModal(<?= $eq_json ?>)">
+      <div class="card-img" onclick="openEqModal(<?= $eq_json ?>)">
         <?php if(!empty($eq['image'])): ?>
           <img src="<?= htmlspecialchars($eq['image']) ?>"
-               style="width:100%;min-height:160px;max-height:200px;object-fit:cover;display:block"
-               onerror="this.parentElement.style.padding='28px 0';this.parentElement.innerHTML='<span style=\'font-size:52px\'>🏅</span>'"/>
+               onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/>
+          <span style="display:none;font-size:52px;align-items:center;justify-content:center;width:100%;height:100%"><?= $eq['icon'] ?: '🏅' ?></span>
         <?php else: ?>
-          <span style="font-size:52px">🏅</span>
+          <span style="font-size:52px"><?= $eq['icon'] ?: '🏅' ?></span>
         <?php endif; ?>
         <?php if($eq['stock']<=2&&$eq['stock']>0): ?><span class="card-stock low">Only <?= $eq['stock'] ?> left</span><?php endif; ?>
         <?php if($eq['stock']<=0): ?><span class="card-stock low">Out of Stock</span><?php endif; ?>
@@ -675,20 +703,47 @@ $id_labels = ['student'=>'Student ID','senior'=>'Senior Citizen ID','pwd'=>'PWD 
 <?php elseif($page==='history'): ?>
   <h2 class="page-title">Rental History</h2>
   <p class="page-sub">All your past and active rentals</p>
+
+  <?php
+  $cancel_success = $_SESSION['cancel_success'] ?? ''; unset($_SESSION['cancel_success']);
+  $cancel_error   = $_SESSION['cancel_error']   ?? ''; unset($_SESSION['cancel_error']);
+  ?>
+  <?php if($cancel_success): ?>
+  <div style="background:#EAF6EE;color:#2E8B57;border:1px solid #C0E0CC;border-radius:10px;padding:12px 16px;font-size:13px;font-weight:500;margin-bottom:18px;">✅ <?= htmlspecialchars($cancel_success) ?></div>
+  <?php endif; ?>
+  <?php if($cancel_error): ?>
+  <div style="background:#FDECEA;color:#C0392B;border:1px solid #F5C6C2;border-radius:10px;padding:12px 16px;font-size:13px;font-weight:500;margin-bottom:18px;">⚠️ <?= htmlspecialchars($cancel_error) ?></div>
+  <?php endif; ?>
+
   <?php if(empty($rentals)): ?>
   <div class="empty-state"><div class="empty-icon">📋</div><p>No rentals yet. <a href="dashboard.php?page=browse" style="color:var(--gold)">Browse equipment</a> to get started!</p></div>
   <?php else: ?>
   <div class="history-list">
     <?php foreach($rentals as $r): ?>
-    <div class="history-card <?= $r['status']==='active'?'active-order':'' ?>">
+    <?php $can_cancel = $r['status'] === 'active' && empty($r['checkout_by']); ?>
+    <div class="history-card <?= $r['status']==='active'?'active-order':'' ?>" style="flex-wrap:wrap;gap:14px;">
       <div><p class="order-id-lbl">Order ID</p><p class="order-id-val"><?= htmlspecialchars($r['order_code']) ?></p></div>
       <div class="order-info">
         <p class="order-name"><?= $r['eq_icon'] ?> <?= htmlspecialchars($r['eq_name']) ?></p>
         <p class="order-date">📅 <?= date('M j', strtotime($r['start_date'])) ?> → <?= date('M j, Y', strtotime($r['end_date'])) ?></p>
       </div>
-      <?php if($r['status']==='active'): ?><span class="status-badge status-active">🟢 Active</span>
-      <?php else: ?><span class="status-badge status-returned">✓ Returned</span><?php endif; ?>
+      <?php if($r['status']==='active'): ?>
+        <span class="status-badge status-active">🟢 Active</span>
+      <?php elseif($r['status']==='cancelled'): ?>
+        <span class="status-badge" style="background:#FDECEA;color:#C0392B;border:1px solid #F5C6C2;">✕ Cancelled</span>
+      <?php else: ?>
+        <span class="status-badge status-returned">✓ Returned</span>
+      <?php endif; ?>
       <span class="order-total <?= $r['status']==='active'?'':'done-total' ?>">₱<?= number_format($r['total_amount'],0) ?></span>
+      <?php if($can_cancel): ?>
+      <button onclick="openCancelModal(<?= $r['id'] ?>,'<?= htmlspecialchars($r['order_code']) ?>','<?= htmlspecialchars($r['eq_name']) ?>')"
+        style="margin-left:auto;background:none;border:1.5px solid #C0392B;color:#C0392B;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .18s;"
+        onmouseover="this.style.background='#FDECEA'" onmouseout="this.style.background='none'">
+        ✕ Cancel
+      </button>
+      <?php elseif($r['status']==='active' && !empty($r['checkout_by'])): ?>
+      <span style="margin-left:auto;font-size:11px;color:var(--muted);font-style:italic;">Already picked up</span>
+      <?php endif; ?>
     </div>
     <?php endforeach; ?>
   </div>
@@ -989,13 +1044,69 @@ document.addEventListener('DOMContentLoaded', function() {
 document.querySelectorAll('.toast.show').forEach(t => setTimeout(()=>t.classList.remove('show'), 7000));
 </script>
 
+<!-- ══ CANCEL BOOKING MODAL ══ -->
+<div id="cancel-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);backdrop-filter:blur(3px);z-index:500;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:18px;padding:28px 30px;width:440px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,.2);">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+      <div style="font-family:'Playfair Display',serif;font-size:18px;font-weight:800;color:#1C1916;">Cancel Booking</div>
+      <button onclick="closeCancelModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#C0B8AE;line-height:1;">×</button>
+    </div>
+    <div style="background:#FDECEA;border:1px solid #F5C6C2;border-radius:10px;padding:13px 14px;margin-bottom:18px;font-size:13px;color:#C0392B;">
+      <strong>⚠️ Are you sure?</strong> You are about to cancel order <strong id="cancel-order-code"></strong> for <strong id="cancel-eq-name"></strong>.
+      <div style="margin-top:6px;font-size:12px;">Loyalty points earned from this booking will be deducted. This cannot be undone.</div>
+    </div>
+    <div style="margin-bottom:6px;font-size:11px;font-weight:700;color:#4A4540;letter-spacing:.04em;text-transform:uppercase;">Reason for cancellation</div>
+    <textarea id="cancel-reason" rows="3" placeholder="e.g. Change of plans, scheduling conflict..."
+      style="width:100%;background:#F7F5F2;border:1.5px solid #E5E0D8;border-radius:10px;padding:10px 14px;font-family:'DM Sans',sans-serif;font-size:13px;color:#1C1916;outline:none;resize:none;margin-bottom:18px;"
+      onfocus="this.style.borderColor='#C47F2B'" onblur="this.style.borderColor='#E5E0D8'"></textarea>
+    <form method="POST" action="dashboard.php?page=history" id="cancel-form">
+      <input type="hidden" name="act" value="cancel_booking"/>
+      <input type="hidden" name="rental_id" id="cancel-rental-id"/>
+      <input type="hidden" name="cancel_reason" id="cancel-reason-hidden"/>
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button type="button" onclick="closeCancelModal()"
+          style="background:none;border:1.5px solid #E5E0D8;color:#4A4540;border-radius:8px;padding:9px 18px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;">
+          Keep Booking
+        </button>
+        <button type="submit" onclick="return submitCancel()"
+          style="background:#C0392B;color:#fff;border:none;border-radius:8px;padding:9px 18px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;">
+          ✕ Confirm Cancel
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openCancelModal(rentalId, orderCode, eqName) {
+  document.getElementById('cancel-rental-id').value = rentalId;
+  document.getElementById('cancel-order-code').textContent = orderCode;
+  document.getElementById('cancel-eq-name').textContent = eqName;
+  document.getElementById('cancel-reason').value = '';
+  document.getElementById('cancel-overlay').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+function closeCancelModal() {
+  document.getElementById('cancel-overlay').style.display = 'none';
+  document.body.style.overflow = '';
+}
+function submitCancel() {
+  const reason = document.getElementById('cancel-reason').value.trim();
+  document.getElementById('cancel-reason-hidden').value = reason || 'No reason provided';
+  return true;
+}
+document.getElementById('cancel-overlay').addEventListener('click', function(e) {
+  if (e.target === this) closeCancelModal();
+});
+</script>
+
 <!-- ══ FOOTER ══ -->
 <footer style="background:#1C1916;color:#fff;padding:40px 40px 24px;margin-top:60px">
-  <div style="max-width:1100px;margin:0 auto">
+  <div style="max-width:1400px;margin:0 auto">
     <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:40px;margin-bottom:32px">
       <div>
         <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:800;margin-bottom:8px">Kinetic<span style="color:var(--gold,#C47F2B)">Borrow</span></div>
-        <p style="font-size:13px;color:#AAA;line-height:1.7;max-width:280px">Premium sports equipment rental for students, athletes, and sports enthusiasts at University of Caloocan City.</p>
+        <p style="font-size:13px;color:#AAA;line-height:1.7;max-width:280px">Premium sports equipment rental for students, athletes, and sports enthusiasts.</p>
         <div style="margin-top:14px;display:flex;gap:10px">
           <span style="background:#333;border-radius:6px;padding:6px 10px;font-size:18px">📘</span>
           <span style="background:#333;border-radius:6px;padding:6px 10px;font-size:18px">📸</span>
@@ -1032,7 +1143,7 @@ document.querySelectorAll('.toast.show').forEach(t => setTimeout(()=>t.classList
       </div>
     </div>
     <div style="border-top:1px solid #333;padding-top:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
-      <p style="font-size:12px;color:#666">© 2025 KineticBorrow · University of Caloocan City · BS Information Systems</p>
+      <p style="font-size:12px;color:#666">© 2025 KineticBorrow </p>
       <p style="font-size:12px;color:#555">Made with ❤️ by Agarano · Marianito · Napilot · Reyes · Tejada</p>
     </div>
   </div>

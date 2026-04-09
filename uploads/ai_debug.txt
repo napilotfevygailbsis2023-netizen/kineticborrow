@@ -114,3 +114,66 @@ RESPONSE: {
   "usageMetadata": {
     "promptTokenCount": 49
 ---
+2026-03-14 03:05:48 model=gemini-2.5-flash http=200
+ERROR: 
+RESPONSE: {
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "{\"is_valid_id\": true, \"id_category\": \"student\", \"id_type_label\": \"University of Caloocan City Student ID\", \"confidence\": 95, \"issues\": [], \"auto_approve\": true, \"reject_reason\": null, \"discount_eligible\": true}"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "index": 0
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 494,
+    "ca
+---
+2026-03-16 12:51:09 model=gemini-2.5-flash http=200
+ERROR: 
+RESPONSE: {
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "{\"is_valid_id\": true, \"id_category\": \"student\", \"id_type_label\": \"University of Caloocan City Student ID\", \"confidence\": 90, \"issues\": [], \"auto_approve\": true, \"reject_reason\": null, \"discount_eligible\": true}"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "index": 0
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 494,
+    "ca
+---
+2026-04-07 19:36:49 model=gemini-2.5-flash http=200
+ERROR: 
+RESPONSE: {
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "{\"is_valid_id\": true, \"id_category\": \"student\", \"id_type_label\": \"University of Caloocan City Student ID\", \"confidence\": 95, \"issues\": [], \"auto_approve\": true, \"reject_reason\": null, \"discount_eligible\": true}"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "index": 0
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 494,
+    "ca
+---

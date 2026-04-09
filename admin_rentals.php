@@ -44,11 +44,17 @@ $rentals = $conn->query($sql." LIMIT $limit OFFSET $offset")->fetch_all(MYSQLI_A
 include 'includes/admin_layout.php';
 ?>
 
+<div style="margin-bottom:24px;display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+  <div>
+    <div style="font-family:'Playfair Display',serif;font-size:26px;font-weight:800;color:var(--text);">Rentals & Orders</div>
+    <div style="font-size:12px;color:var(--muted);margin-top:3px;">Monitor bookings, returns, and cancellations</div>
+  </div>
+</div>
+
+
 <?php if($msg): ?><div class="alert alert-success">✅ <?= htmlspecialchars($msg) ?></div><?php endif; ?>
 
-<div class="page-head">
-  <div><div class="page-head-title">Rentals & Orders</div><div class="page-head-sub">Monitor bookings, returns, and cancellations</div></div>
-</div>
+
 
 <div class="search-bar">
   <form method="GET" style="display:contents">
@@ -118,12 +124,17 @@ include 'includes/admin_layout.php';
           <?php endif; ?>
         </td>
         <td>
-          <?php if($r['status'] === 'active'): ?>
-            <button class="btn btn-outline btn-sm" onclick="updateStatus(<?= $r['id'] ?>,'<?= $r['order_code'] ?>','<?= $r['status'] ?>')">Update</button>
-          <?php else: ?>
-            <span style="font-size:11px;color:var(--muted)">
-              <?= $r['status']==='returned'?'↓ By handler':'✕ By customer' ?>
-            </span>
+          <?php
+          $checked_out = !empty($r['checkout_by']);
+          $checked_in  = !empty($r['checkin_by']);
+          if ($r['status'] === 'cancelled'): ?>
+            <span style="font-size:11px;color:var(--muted)">✕ Cancelled</span>
+          <?php elseif ($r['status'] === 'returned'): ?>
+            <span style="font-size:11px;color:var(--green)">✓ Returned</span>
+          <?php elseif ($r['status'] === 'active' && $checked_out): ?>
+            <span style="font-size:11px;color:var(--muted)">📦 Picked up · awaiting return</span>
+          <?php elseif ($r['status'] === 'active' && !$checked_out): ?>
+            <button class="btn btn-red btn-sm" onclick="updateStatus(<?= $r['id'] ?>,'<?= $r['order_code'] ?>','<?= $r['status'] ?>')">Cancel</button>
           <?php endif; ?>
         </td>
       </tr>

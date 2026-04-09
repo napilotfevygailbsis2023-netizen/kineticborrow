@@ -41,18 +41,23 @@ if ($filter === 'unblocked') $sql .= " WHERE b.status='unblocked'";
 $sql .= " ORDER BY b.updated_at DESC";
 $blocklist = $conn->query($sql)->fetch_all(MYSQLI_ASSOC);
 
-// Users not on blocklist for adding
+
 $not_blocked = $conn->query("SELECT id, first_name, last_name, email FROM users WHERE is_blocked=0 ORDER BY first_name")->fetch_all(MYSQLI_ASSOC);
 
 include 'includes/admin_layout.php';
 ?>
 
+<div style="margin-bottom:24px;display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+  <div>
+    <div style="font-family:'Playfair Display',serif;font-size:26px;font-weight:800;color:var(--text);">Blocklist Management</div>
+    <div style="font-size:12px;color:var(--muted);margin-top:3px;">Flag, suspend, or unblock customer accounts</div>
+  </div>
+</div>
+
+
 <?php if($msg): ?><div class="alert alert-success">✅ <?= htmlspecialchars($msg) ?></div><?php endif; ?>
 
-<div class="page-head">
-  <div><div class="page-head-title">Blocklist Management</div><div class="page-head-sub">Flag, suspend, or unblock customer accounts</div></div>
-  <button class="btn btn-gold" onclick="openModal('modal-add-block')">+ Flag Account</button>
-</div>
+<div style="display:flex;justify-content:flex-end;margin-bottom:16px"><button class="btn btn-gold" onclick="openModal('modal-add-block')">+ Flag Account</button></div>
 
 <div class="search-bar">
   <div style="display:flex;gap:6px">
@@ -100,7 +105,6 @@ include 'includes/admin_layout.php';
   </table>
 </div>
 
-<!-- ADD TO BLOCKLIST MODAL -->
 <div class="modal-overlay" id="modal-add-block">
   <div class="modal">
     <div class="modal-header"><h3 class="modal-title">Flag / Block Account</h3><button class="modal-close" onclick="closeModal('modal-add-block')">×</button></div>
