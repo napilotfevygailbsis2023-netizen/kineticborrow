@@ -1,11 +1,14 @@
 <?php
-define('DB_HOST', 'localhost');
-define('DB_USER', 'root');
-define('DB_PASS', '');
-define('DB_NAME', 'kineticborrow');
+// db.php — supports both local XAMPP and Railway deployment
+// On Railway, set these as environment variables in the Variables tab
 
-// Anthropic API Key — replace with your actual key
-define('ANTHROPIC_API_KEY', 'YOUR_NEW_API_KEY_HERE');
+define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
+define('DB_USER', getenv('DB_USER') ?: 'root');
+define('DB_PASS', getenv('DB_PASS') ?: '');
+define('DB_NAME', getenv('DB_NAME') ?: 'kineticborrow');
+
+// API Keys — set as environment variables on Railway
+define('ANTHROPIC_API_KEY', getenv('ANTHROPIC_API_KEY') ?: 'YOUR_KEY_HERE');
 
 $conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
 
