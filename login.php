@@ -111,6 +111,7 @@ $pv = function($k) { return htmlspecialchars($_POST[$k] ?? ''); };
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <link rel="stylesheet" href="css/style.css">
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>KineticBorrow — <?= $active_tab === 'register' ? 'Register' : 'Log In' ?></title>
@@ -440,8 +441,9 @@ $pv = function($k) { return htmlspecialchars($_POST[$k] ?? ''); };
             <div class="custom-check" id="terms-chk" onclick="this.classList.toggle('on')"></div>
             <p class="check-lbl" onclick="document.getElementById('terms-chk').classList.toggle('on')">
               By signing up, you agree to KineticBorrow's
-              <a href="#">Terms and Conditions</a> and <a href="#">Privacy Policy</a>.
-            </p>
+              <a href="javascript:void(0)" onclick="openModal('terms')" class="button link">terms and conditions </a> and
+              <a href="javascript:void(0)" onclick="openModal('privacy')">Privacy Policy</a>
+                        </p>
           </div>
 
           <button type="submit" class="submit-btn" onclick="return checkTerms()">Create an Account →</button>
@@ -503,5 +505,35 @@ $pv = function($k) { return htmlspecialchars($_POST[$k] ?? ''); };
     lbl.textContent = lvl.t; lbl.style.color = lvl.c;
   }
 </script>
+
+<script>
+function openModal(type){
+  const overlay = document.getElementById('modal-overlay');
+  const title = document.getElementById('modal-title');
+  const content = document.getElementById('modal-content');
+
+  if(type === 'terms'){
+    title.innerText = "Terms and Conditions";
+    content.innerHTML = "Terms and Conditions unavailable for now";
+  } else if(type === 'privacy'){
+    title.innerText = "Privacy Policy";
+    content.innerHTML = "Privacy Policy is temporarily unavailable";
+  }
+
+  overlay.style.display = "flex";
+}
+
+function closeModal(){
+  document.getElementById('modal-overlay').style.display = "none";
+}
+</script>
+
+<div id="modal-overlay" class="modal-overlay" onclick="closeModal()">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <span class="close-btn" onclick="closeModal()">✖</span>
+    <h2 id="modal-title"></h2>
+    <div id="modal-content"></div>
+  </div>
+</div>
 </body>
 </html>
