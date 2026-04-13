@@ -1,4 +1,0 @@
-  </div><!-- /content -->
-</div><!-- /main -->
-</body>
-</html>
