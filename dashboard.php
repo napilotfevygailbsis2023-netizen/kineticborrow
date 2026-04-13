@@ -104,6 +104,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header("Location: dashboard.php?page=cart"); exit();
     }
 
+    if ($act === 'update_profile') {
+        $fname = trim($conn->real_escape_string($_POST['first_name'] ?? ''));
+        $lname = trim($conn->real_escape_string($_POST['last_name']  ?? ''));
+        $phone = trim($conn->real_escape_string($_POST['phone']      ?? ''));
+        if ($fname && $lname) {
+            $conn->query("UPDATE users SET first_name='$fname', last_name='$lname', phone='$phone' WHERE id=$user_id");
+            $user = $conn->query("SELECT * FROM users WHERE id=$user_id")->fetch_assoc();
+            $_SESSION['user'] = $user;
+            $_SESSION['profile_msg'] = 'Personal information updated.';
+        }
+        header('Location: dashboard.php?page=profile'); exit();
+    }
+
+    if ($act === 'change_password') {
+        $current  = $_POST['current_password'] ?? '';
+        $new_pass = $_POST['new_password']     ?? '';
+        $confirm  = $_POST['confirm_password'] ?? '';
+        $u = $conn->query("SELECT password FROM users WHERE id=$user_id")->fetch_assoc();
+        if (!password_verify($current, $u['password'])) {
+            $_SESSION['pw_error'] = 'Current password is incorrect.';
+        } elseif (strlen($new_pass) < 6) {
+            $_SESSION['pw_error'] = 'New password must be at least 6 characters.';
+        } elseif ($new_pass !== $confirm) {
+            $_SESSION['pw_error'] = 'Passwords do not match.';
+        } else {
+            $hashed = password_hash($new_pass, PASSWORD_DEFAULT);
+            $conn->query("UPDATE users SET password='$hashed' WHERE id=$user_id");
+            $_SESSION['pw_msg'] = 'Password updated successfully.';
+        }
+        header('Location: dashboard.php?page=profile'); exit();
+    }
+
     if ($act === 'save_notifications') {
         $fields = ['notif_promo_email','notif_promo_sms','notif_reminder_email',
                    'notif_reminder_sms','notif_account_email','notif_account_sms'];
@@ -286,8 +318,9 @@ $id_labels = ['student'=>'Student ID','senior'=>'Senior Citizen ID','pwd'=>'PWD 
     .eq-overlay{position:fixed;inset:0;background:rgba(0,0,0,.52);z-index:1000;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px);padding:16px;}
     .eq-overlay.show{display:flex;}
     .eq-modal{background:#fff;border-radius:22px;width:540px;max-width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 28px 80px rgba(0,0,0,.22);position:relative;animation:slideUp .25s ease;}
-    .eq-modal-img{width:100%;max-height:260px;object-fit:cover;border-radius:22px 22px 0 0;display:block;}
-    .eq-modal-img-placeholder{background:var(--gold-bg);height:200px;display:flex;align-items:center;justify-content:center;font-size:72px;border-radius:22px 22px 0 0;}
+    .eq-modal-img-wrap{width:100%;background:#f8f8f8;border-radius:22px 22px 0 0;display:flex;align-items:center;justify-content:center;overflow:hidden;min-height:260px;max-height:340px;}
+    .eq-modal-img{width:100%;height:300px;object-fit:contain;display:block;padding:16px;}
+    .eq-modal-img-placeholder{background:var(--gold-bg);height:260px;width:100%;display:flex;align-items:center;justify-content:center;font-size:72px;border-radius:22px 22px 0 0;}
     .eq-modal-body{padding:24px 28px 28px;}
     .eq-modal-close{position:absolute;top:14px;right:16px;background:rgba(0,0,0,.35);border:none;width:32px;height:32px;border-radius:50%;font-size:16px;cursor:pointer;color:#fff;display:flex;align-items:center;justify-content:center;transition:background .2s;}
     .eq-modal-close:hover{background:rgba(0,0,0,.6);}
@@ -557,7 +590,7 @@ $id_labels = ['student'=>'Student ID','senior'=>'Senior Citizen ID','pwd'=>'PWD 
 <div class="eq-overlay" id="eq-overlay" onclick="if(event.target===this)closeEqModal()">
   <div class="eq-modal" id="eq-modal">
     <button class="eq-modal-close" onclick="closeEqModal()">✕</button>
-    <div id="eq-modal-img-wrap"></div>
+    <div id="eq-modal-img-wrap" class="eq-modal-img-wrap"></div>
     <div class="eq-modal-body">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:6px">
         <div>
@@ -766,69 +799,174 @@ $id_labels = ['student'=>'Student ID','senior'=>'Senior Citizen ID','pwd'=>'PWD 
   $upload_msg   = $_SESSION['id_upload_msg']   ?? ''; unset($_SESSION['id_upload_msg']);
   $upload_error = $_SESSION['id_upload_error'] ?? ''; unset($_SESSION['id_upload_error']);
   $notif_saved  = $_SESSION['notif_saved']     ?? false; unset($_SESSION['notif_saved']);
+  $profile_msg  = $_SESSION['profile_msg']     ?? ''; unset($_SESSION['profile_msg']);
+  $pw_msg       = $_SESSION['pw_msg']          ?? ''; unset($_SESSION['pw_msg']);
+  $pw_error     = $_SESSION['pw_error']        ?? ''; unset($_SESSION['pw_error']);
   $user = $conn->query("SELECT * FROM users WHERE id={$user['id']}")->fetch_assoc();
   $_SESSION['user'] = $user;
   $id_status = $user['id_status'] ?? 'none';
 ?>
-  <div class="profile-wrap">
-    <div class="profile-card">
-      <div class="profile-avatar"><?= strtoupper(substr($user['first_name'],0,1)) ?></div>
-      <p class="profile-name"><?= htmlspecialchars($user['first_name'].' '.$user['last_name']) ?></p>
-      <p class="profile-email"><?= htmlspecialchars($user['email']) ?></p>
-      <?php if($id_status==='approved'&&$user['id_type']!=='regular'): ?>
-        <div class="verified-pill">✅ <?= $id_labels[$user['id_type']] ?> — 20% Discount Active</div>
-      <?php elseif($id_status==='pending'): ?>
-        <div class="verified-pill" style="background:#FEF3E2;color:#E07C35;border-color:#FADDB8">⏳ ID Under Review</div>
-      <?php elseif($id_status==='rejected'): ?>
-        <div class="verified-pill" style="background:#FDECEA;color:#C0392B;border-color:#F5C6C2">❌ ID Rejected — Please resubmit</div>
-      <?php else: ?>
-        <div class="verified-pill" style="background:#F2F0EE;color:#8A8078;border-color:#E5E0D8">🪪 No ID submitted yet</div>
-      <?php endif; ?>
-    </div>
-    <div class="stats-grid">
-      <div class="stat-card"><p style="font-size:22px;margin-bottom:6px">🏅</p><p class="stat-val"><?= count($rentals) ?></p><p class="stat-lbl">Total Rentals</p></div>
-      <div class="stat-card"><p style="font-size:22px;margin-bottom:6px">⭐</p><p class="stat-val"><?= number_format($user['loyalty_pts']) ?></p><p class="stat-lbl">Loyalty Points</p></div>
-      <div class="stat-card"><p style="font-size:22px;margin-bottom:6px">📦</p><p class="stat-val"><?= count(array_filter($rentals,fn($r)=>$r['status']==='active')) ?></p><p class="stat-lbl">Active Bookings</p></div>
-      <div class="stat-card"><p style="font-size:22px;margin-bottom:6px">💰</p><p class="stat-val">₱<?= number_format(array_sum(array_map(fn($r)=>$r['total_amount']*($r['discount_pct']/100),array_filter($rentals,fn($r)=>$r['discount_pct']>0))),0) ?></p><p class="stat-lbl">Total Saved</p></div>
-    </div>
-    <div class="settings-card">
-      <p class="settings-title">🪪 ID Verification</p>
-      <p style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.6">
-        ID verification is <strong>required to book equipment</strong>. It protects our gear and ensures accountability.
-        Students, Senior Citizens, and PWD customers also get a <strong style="color:var(--gold)">20% discount</strong> after verification.
-      </p>
-      <?php if($upload_msg): ?>
-        <div style="background:#EAF6EE;color:#2E8B57;border:1px solid #C0E0CC;border-radius:10px;padding:12px 14px;font-size:13px;font-weight:500;margin-bottom:16px">✅ <?= htmlspecialchars($upload_msg) ?></div>
-      <?php endif; ?>
-      <?php if($upload_error): ?>
-        <div style="background:#FDECEA;color:#C0392B;border:1px solid #F5C6C2;border-radius:10px;padding:12px 14px;font-size:13px;margin-bottom:16px">⚠️ <?= htmlspecialchars($upload_error) ?></div>
-      <?php endif; ?>
-      <?php if($id_status==='rejected'&&$user['id_reject_reason']): ?>
-        <div style="background:#FDECEA;color:#C0392B;border:1px solid #F5C6C2;border-radius:10px;padding:12px 14px;font-size:13px;margin-bottom:16px"><strong>Rejection reason:</strong> <?= htmlspecialchars($user['id_reject_reason']) ?></div>
-      <?php endif; ?>
-      <?php if($id_status==='approved'): ?>
-        <div style="background:#EAF6EE;border:1px solid #C0E0CC;border-radius:12px;padding:16px;text-align:center">
-          <p style="font-size:22px;margin-bottom:6px">✅</p>
-          <p style="font-weight:600;color:#2E8B57;font-size:14px">Your <?= ucfirst($user['id_type']) ?> ID is verified!</p>
-          <p style="font-size:12px;color:#2E8B57;margin-top:4px">You can now book equipment. <?= $user['id_type']!=='regular'?'20% discount applied to all rentals.':'' ?></p>
-          <?php if($user['id_image']): ?><img src="<?= htmlspecialchars($user['id_image']) ?>" style="max-width:100%;max-height:180px;border-radius:10px;border:2px solid #C0E0CC;object-fit:cover;margin-top:14px"/><?php endif; ?>
-          <p style="font-size:12px;color:#2E8B57;margin-top:12px">Need to update? <a href="#" onclick="document.getElementById('reup').style.display='block';this.style.display='none'" style="color:var(--gold);font-weight:600">Resubmit</a></p>
-          <div id="reup" style="display:none;margin-top:14px"><?php include_once 'includes/id_upload_form.php'; ?></div>
+<style>
+.profile-wrap{max-width:860px;margin:0 auto;}
+.profile-sidebar{background:linear-gradient(160deg,#FDF0DC,#FFF9F2);border:1px solid #EDD8B0;border-radius:18px;padding:28px 22px;text-align:center;}
+.profile-avatar{width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,var(--gold),#8B5E1A);display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:700;color:#fff;margin:0 auto 14px;overflow:hidden;}
+.profile-avatar img{width:100%;height:100%;object-fit:cover;}
+.profile-section-card{background:#fff;border:1px solid var(--border);border-radius:16px;padding:24px 28px;margin-bottom:16px;box-shadow:0 1px 6px rgba(0,0,0,.04);}
+.profile-section-title{font-size:15px;font-weight:700;color:var(--text);margin-bottom:18px;display:flex;align-items:center;gap:8px;}
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px 28px;}
+.info-item label{display:block;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;}
+.info-item p{font-size:14px;color:var(--text);font-weight:500;}
+.edit-input{width:100%;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;padding:9px 13px;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text);outline:none;transition:all .2s;}
+.edit-input:focus{border-color:var(--gold);background:#fff;box-shadow:0 0 0 3px rgba(196,127,43,.1);}
+</style>
+
+<div class="profile-wrap">
+  <div style="display:grid;grid-template-columns:220px 1fr;gap:20px;align-items:start;">
+
+    <!-- SIDEBAR -->
+    <div class="profile-sidebar">
+      <div class="profile-avatar">
+        <?php if(!empty($user['avatar'])): ?>
+          <img src="<?= htmlspecialchars($user['avatar']) ?>"/>
+        <?php else: ?>
+          <?= strtoupper(substr($user['first_name'],0,1)) ?>
+        <?php endif; ?>
+      </div>
+      <p style="font-family:'Playfair Display',serif;font-size:17px;font-weight:800;margin-bottom:2px"><?= htmlspecialchars($user['first_name'].' '.$user['last_name']) ?></p>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:10px"><?= htmlspecialchars($user['email']) ?></p>
+      <div style="background:var(--gold-bg);border:1px solid #EDD8B0;border-radius:20px;padding:4px 14px;display:inline-block;font-size:12px;color:var(--gold);font-weight:700">⭐ <?= number_format($user['loyalty_pts']) ?> pts</div>
+
+      <div style="margin-top:20px;border-top:1px solid #EDD8B0;padding-top:16px;text-align:left">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+          <div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center">
+            <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:800;color:var(--gold)"><?= count($rentals) ?></div>
+            <div style="font-size:11px;color:var(--muted)">Rentals</div>
+          </div>
+          <div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center">
+            <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:800;color:var(--gold)"><?= count(array_filter($rentals,fn($r)=>$r['status']==='active')) ?></div>
+            <div style="font-size:11px;color:var(--muted)">Active</div>
+          </div>
         </div>
-      <?php elseif($id_status==='pending'): ?>
-        <div style="background:#FEF3E2;border:1px solid #FADDB8;border-radius:12px;padding:16px;text-align:center">
-          <p style="font-size:28px;margin-bottom:8px">⏳</p>
-          <p style="font-weight:600;color:#E07C35;font-size:14px">Your ID is being reviewed</p>
-          <p style="font-size:12px;color:#E07C35;margin-top:4px">Usually verified within 24 hours. Booking will be unlocked once approved.</p>
-          <?php if($user['id_image']): ?><img src="<?= htmlspecialchars($user['id_image']) ?>" style="max-width:100%;max-height:180px;border-radius:10px;border:2px solid #FADDB8;object-fit:cover;margin-top:14px"/><?php endif; ?>
-          <p style="font-size:12px;color:#E07C35;margin-top:12px">Wrong file? <a href="#" onclick="document.getElementById('reup2').style.display='block';this.style.display='none'" style="color:var(--gold);font-weight:600">Resubmit</a></p>
-          <div id="reup2" style="display:none;margin-top:14px"><?php include_once 'includes/id_upload_form.php'; ?></div>
-        </div>
-      <?php else: ?>
-        <?php include_once 'includes/id_upload_form.php'; ?>
-      <?php endif; ?>
+        <?php if($id_status==='approved'&&$user['id_type']!=='regular'): ?>
+          <div class="verified-pill">✅ <?= $id_labels[$user['id_type']] ?> — 20% off</div>
+        <?php elseif($id_status==='pending'): ?>
+          <div class="verified-pill" style="background:#FEF3E2;color:#E07C35;border-color:#FADDB8">⏳ ID Under Review</div>
+        <?php elseif($id_status==='rejected'): ?>
+          <div class="verified-pill" style="background:#FDECEA;color:#C0392B;border-color:#F5C6C2">❌ ID Rejected</div>
+        <?php else: ?>
+          <div class="verified-pill" style="background:#F2F0EE;color:#8A8078;border-color:#E5E0D8">🪪 No ID yet</div>
+        <?php endif; ?>
+      </div>
     </div>
-    <!-- NOTIFICATION SETTINGS CARD -->
+
+    <!-- RIGHT CONTENT -->
+    <div>
+
+      <?php if($profile_msg): ?>
+      <div style="background:#EAF6EE;color:#2E8B57;border:1px solid #C0E0CC;border-radius:10px;padding:12px 16px;font-size:13px;font-weight:500;margin-bottom:16px">✅ <?= htmlspecialchars($profile_msg) ?></div>
+      <?php endif; ?>
+
+      <!-- PERSONAL INFORMATION -->
+      <div class="profile-section-card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+          <div class="profile-section-title" style="margin-bottom:0">👤 Personal Information</div>
+          <button onclick="toggleEdit()" id="edit-btn" style="background:none;border:1.5px solid var(--border);color:var(--text2);padding:6px 16px;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:all .18s" onmouseover="this.style.borderColor='var(--gold)';this.style.color='var(--gold)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text2)'">✏️ Edit</button>
+        </div>
+
+        <!-- VIEW MODE -->
+        <div id="view-mode" class="info-grid">
+          <div class="info-item"><label>First Name</label><p><?= htmlspecialchars($user['first_name']) ?></p></div>
+          <div class="info-item"><label>Last Name</label><p><?= htmlspecialchars($user['last_name']) ?></p></div>
+          <div class="info-item"><label>Email Address</label><p><?= htmlspecialchars($user['email']) ?></p></div>
+          <div class="info-item"><label>Phone Number</label><p><?= htmlspecialchars($user['phone'] ?: '—') ?></p></div>
+          <div class="info-item"><label>ID Type</label><p><?= ucfirst($user['id_type']) ?></p></div>
+          <div class="info-item"><label>Member Since</label><p><?= date('F j, Y', strtotime($user['created_at'])) ?></p></div>
+        </div>
+
+        <!-- EDIT MODE -->
+        <form method="POST" action="dashboard.php?page=profile" id="edit-mode" style="display:none">
+          <input type="hidden" name="act" value="update_profile"/>
+          <div class="info-grid">
+            <div class="info-item"><label>First Name *</label><input class="edit-input" name="first_name" value="<?= htmlspecialchars($user['first_name']) ?>" required/></div>
+            <div class="info-item"><label>Last Name *</label><input class="edit-input" name="last_name" value="<?= htmlspecialchars($user['last_name']) ?>" required/></div>
+            <div class="info-item"><label>Email Address</label><input class="edit-input" value="<?= htmlspecialchars($user['email']) ?>" disabled style="opacity:.6;cursor:not-allowed"/></div>
+            <div class="info-item"><label>Phone Number</label><input class="edit-input" name="phone" value="<?= htmlspecialchars($user['phone']) ?>" placeholder="09XX XXX XXXX"/></div>
+          </div>
+          <div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end">
+            <button type="button" onclick="toggleEdit()" style="background:none;border:1.5px solid var(--border);color:var(--text2);padding:8px 20px;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer">Cancel</button>
+            <button type="submit" style="background:var(--gold);color:#fff;border:none;padding:8px 24px;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer">Save Changes</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- PASSWORD & SECURITY -->
+      <div class="profile-section-card">
+        <div class="profile-section-title">🔒 Password &amp; Security</div>
+        <?php if($pw_msg): ?>
+          <div style="background:#EAF6EE;color:#2E8B57;border:1px solid #C0E0CC;border-radius:10px;padding:11px 14px;font-size:13px;margin-bottom:14px">✅ <?= htmlspecialchars($pw_msg) ?></div>
+        <?php endif; ?>
+        <?php if($pw_error): ?>
+          <div style="background:#FDECEA;color:#C0392B;border:1px solid #F5C6C2;border-radius:10px;padding:11px 14px;font-size:13px;margin-bottom:14px">⚠️ <?= htmlspecialchars($pw_error) ?></div>
+        <?php endif; ?>
+        <form method="POST" action="dashboard.php?page=profile">
+          <input type="hidden" name="act" value="change_password"/>
+          <div class="info-item" style="margin-bottom:14px">
+            <label>Current Password *</label>
+            <div style="position:relative"><input class="edit-input" type="password" name="current_password" id="cp1" placeholder="Enter your current password" required/><button type="button" onclick="togglePw('cp1',this)" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:14px;color:var(--muted)">👁️</button></div>
+          </div>
+          <div class="info-grid" style="margin-bottom:8px">
+            <div class="info-item">
+              <label>New Password *</label>
+              <div style="position:relative"><input class="edit-input" type="password" name="new_password" id="cp2" placeholder="Min 6 characters" required/><button type="button" onclick="togglePw('cp2',this)" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:14px;color:var(--muted)">👁️</button></div>
+            </div>
+            <div class="info-item">
+              <label>Confirm New Password *</label>
+              <div style="position:relative"><input class="edit-input" type="password" name="confirm_password" id="cp3" placeholder="Re-enter new password" required/><button type="button" onclick="togglePw('cp3',this)" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:14px;color:var(--muted)">👁️</button></div>
+            </div>
+          </div>
+          <p style="font-size:11px;color:var(--muted);margin-bottom:14px">Use 6+ characters, uppercase, lowercase &amp; number recommended</p>
+          <button type="submit" style="background:var(--gold);color:#fff;border:none;padding:10px 28px;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:all .2s" onmouseover="this.style.background='#D9952E'" onmouseout="this.style.background='var(--gold)'">Update Password</button>
+        </form>
+      </div>
+
+      <!-- ID VERIFICATION -->
+      <div class="profile-section-card">
+        <div class="profile-section-title">🪪 ID Verification</div>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.6">
+          ID verification is <strong>required to book equipment</strong>. Students, Senior Citizens, and PWD customers get a <strong style="color:var(--gold)">20% discount</strong> after verification.
+        </p>
+        <?php if($upload_msg): ?>
+          <div style="background:#EAF6EE;color:#2E8B57;border:1px solid #C0E0CC;border-radius:10px;padding:12px 14px;font-size:13px;font-weight:500;margin-bottom:16px">✅ <?= htmlspecialchars($upload_msg) ?></div>
+        <?php endif; ?>
+        <?php if($upload_error): ?>
+          <div style="background:#FDECEA;color:#C0392B;border:1px solid #F5C6C2;border-radius:10px;padding:12px 14px;font-size:13px;margin-bottom:16px">⚠️ <?= htmlspecialchars($upload_error) ?></div>
+        <?php endif; ?>
+        <?php if($id_status==='rejected'&&$user['id_reject_reason']): ?>
+          <div style="background:#FDECEA;color:#C0392B;border:1px solid #F5C6C2;border-radius:10px;padding:12px 14px;font-size:13px;margin-bottom:16px"><strong>Rejection reason:</strong> <?= htmlspecialchars($user['id_reject_reason']) ?></div>
+        <?php endif; ?>
+        <?php if($id_status==='approved'): ?>
+          <div style="background:#EAF6EE;border:1px solid #C0E0CC;border-radius:12px;padding:16px;text-align:center">
+            <p style="font-size:22px;margin-bottom:6px">✅</p>
+            <p style="font-weight:600;color:#2E8B57;font-size:14px">Your <?= ucfirst($user['id_type']) ?> ID is verified!</p>
+            <p style="font-size:12px;color:#2E8B57;margin-top:4px"><?= $user['id_type']!=='regular'?'20% discount applied to all rentals.':'' ?></p>
+            <?php if($user['id_image']): ?><img src="<?= htmlspecialchars($user['id_image']) ?>" style="max-width:100%;max-height:160px;border-radius:10px;border:2px solid #C0E0CC;object-fit:cover;margin-top:14px"/><?php endif; ?>
+            <p style="font-size:12px;color:#2E8B57;margin-top:12px">Need to update? <a href="#" onclick="document.getElementById('reup').style.display='block';this.style.display='none'" style="color:var(--gold);font-weight:600">Resubmit</a></p>
+            <div id="reup" style="display:none;margin-top:14px"><?php include_once 'includes/id_upload_form.php'; ?></div>
+          </div>
+        <?php elseif($id_status==='pending'): ?>
+          <div style="background:#FEF3E2;border:1px solid #FADDB8;border-radius:12px;padding:16px;text-align:center">
+            <p style="font-size:28px;margin-bottom:8px">⏳</p>
+            <p style="font-weight:600;color:#E07C35;font-size:14px">Your ID is being reviewed</p>
+            <p style="font-size:12px;color:#E07C35;margin-top:4px">Usually verified within 24 hours.</p>
+            <?php if($user['id_image']): ?><img src="<?= htmlspecialchars($user['id_image']) ?>" style="max-width:100%;max-height:160px;border-radius:10px;border:2px solid #FADDB8;object-fit:cover;margin-top:14px"/><?php endif; ?>
+            <p style="font-size:12px;color:#E07C35;margin-top:12px">Wrong file? <a href="#" onclick="document.getElementById('reup2').style.display='block';this.style.display='none'" style="color:var(--gold);font-weight:600">Resubmit</a></p>
+            <div id="reup2" style="display:none;margin-top:14px"><?php include_once 'includes/id_upload_form.php'; ?></div>
+          </div>
+        <?php else: ?>
+          <?php include_once 'includes/id_upload_form.php'; ?>
+        <?php endif; ?>
+      </div>
+      <!-- NOTIFICATION SETTINGS CARD -->
     <div class="settings-card" id="notifications">
       <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;margin-bottom:0" onclick="toggleNotifCard()">
         <div>
@@ -890,14 +1028,32 @@ $id_labels = ['student'=>'Student ID','senior'=>'Senior Citizen ID','pwd'=>'PWD 
       </div>
     </div>
 
-    <!-- ACCOUNT SETTINGS -->
-    <div class="settings-card">
-      <p class="settings-title">Account Settings</p>
-      <div class="settings-item"><span class="settings-item-lbl">Edit Profile</span><span class="settings-arrow">›</span></div>
-      <div class="settings-item"><span class="settings-item-lbl">Change Password</span><span class="settings-arrow">›</span></div>
-      <a href="logout.php" class="settings-item" style="color:inherit"><span class="settings-item-lbl danger">Log Out</span><span class="settings-arrow">›</span></a>
-    </div>
-  </div>
+    </div><!-- /right content -->
+  </div><!-- /grid -->
+</div><!-- /profile-wrap -->
+
+<script>
+function toggleEdit() {
+  const view = document.getElementById('view-mode');
+  const edit = document.getElementById('edit-mode');
+  const btn  = document.getElementById('edit-btn');
+  if(edit.style.display === 'none') {
+    view.style.display = 'none';
+    edit.style.display = 'block';
+    btn.textContent = '✕ Cancel';
+  } else {
+    view.style.display = 'grid';
+    edit.style.display = 'none';
+    btn.textContent = '✏️ Edit';
+  }
+}
+function togglePw(id, btn) {
+  const el = document.getElementById(id);
+  el.type = el.type === 'password' ? 'text' : 'password';
+  btn.textContent = el.type === 'password' ? '👁️' : '🙈';
+}
+</script>
+
 <?php endif; ?>
 </div>
 

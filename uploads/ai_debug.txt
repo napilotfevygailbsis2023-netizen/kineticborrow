@@ -177,3 +177,24 @@ RESPONSE: {
     "promptTokenCount": 494,
     "ca
 ---
+2026-04-11 09:35:41 model=gemini-2.5-flash http=200
+ERROR: 
+RESPONSE: {
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "{\"is_valid_id\": true, \"id_category\": \"student\", \"id_type_label\": \"University of Caloocan City Student ID\", \"confidence\": 95, \"issues\": [], \"auto_approve\": true, \"reject_reason\": null, \"discount_eligible\": true}"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "index": 0
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 494,
+    "ca
+---

@@ -2,6 +2,12 @@
 require_once 'includes/auth.php';
 require_once 'includes/db.php';
 
+// Safely load .env if vendor exists (not needed on Railway - env vars set there)
+if (file_exists(__DIR__ . '/vendor/autoload.php') && class_exists('Dotenv\Dotenv')) {
+    $dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
+    $dotenv->safeLoad();
+}
+
 // Fetch equipment from DB for display
 $eq_result = $conn->query("SELECT * FROM equipment WHERE is_active = 1 ORDER BY review_count DESC LIMIT 6");
 $equipment = $eq_result ? $eq_result->fetch_all(MYSQLI_ASSOC) : [];
@@ -298,6 +304,13 @@ $cat_icons = [
     </div>
     <?php endforeach; ?>
   </div>
+  <!-- SEE MORE BUTTON -->
+  <div style="text-align:center;margin-top:28px">
+    <a href="login.php" onclick="event.preventDefault();promptLogin()" style="display:inline-flex;align-items:center;gap:8px;background:none;border:2px solid var(--gold);color:var(--gold);padding:12px 32px;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;cursor:pointer;text-decoration:none;transition:all .2s;" onmouseover="this.style.background='var(--gold)';this.style.color='#fff'" onmouseout="this.style.background='none';this.style.color='var(--gold)'">
+      View All Equipment →
+    </a>
+    <p style="font-size:12px;color:var(--muted);margin-top:10px">Sign in to browse all equipment and make a booking</p>
+  </div>
 </section>
 
 <!-- HOW IT WORKS -->
@@ -365,18 +378,67 @@ $cat_icons = [
   </div>
 </section>
 
+<!-- ABOUT US -->
+<section class="section" id="section-about" style="background:#fff;border-top:1px solid var(--border)">
+  <h2 class="section-title">About KineticBorrow</h2>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:center;max-width:900px;margin:0 auto">
+    <div>
+      <p style="font-family:'Playfair Display',serif;font-size:22px;font-weight:800;color:var(--text);margin-bottom:14px;line-height:1.3">Your Trusted Sports Equipment Rental Platform</p>
+      <p style="font-size:14px;color:var(--text2);line-height:1.8;margin-bottom:14px">KineticBorrow is a sports equipment rental platform built for students, athletes, and sports enthusiasts at the University of Caloocan City. We believe everyone deserves access to quality sports gear without the high cost of ownership.</p>
+      <p style="font-size:14px;color:var(--text2);line-height:1.8;margin-bottom:20px">Our AI-powered ID verification system automatically detects and applies discounts for Students, Senior Citizens, and PWD customers — no manual processing needed.</p>
+      <div style="display:flex;gap:24px">
+        <div style="text-align:center">
+          <div style="font-family:'Playfair Display',serif;font-size:28px;font-weight:800;color:var(--gold)">20%</div>
+          <div style="font-size:12px;color:var(--muted)">Discount for Students,<br>Seniors & PWD</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-family:'Playfair Display',serif;font-size:28px;font-weight:800;color:var(--gold)">3-day</div>
+          <div style="font-size:12px;color:var(--muted)">Max rental<br>per equipment</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-family:'Playfair Display',serif;font-size:28px;font-weight:800;color:var(--gold)">AI</div>
+          <div style="font-size:12px;color:var(--muted)">Powered ID<br>Verification</div>
+        </div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div style="background:var(--gold-bg);border:1px solid #EDD8B0;border-radius:14px;padding:20px;text-align:center">
+        <div style="font-size:32px;margin-bottom:8px">🏫</div>
+        <div style="font-weight:700;font-size:13px;color:var(--text)">University of Caloocan City</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px">BS Information Systems</div>
+      </div>
+      <div style="background:#EAF6EE;border:1px solid #C0E0CC;border-radius:14px;padding:20px;text-align:center">
+        <div style="font-size:32px;margin-bottom:8px">🕐</div>
+        <div style="font-weight:700;font-size:13px;color:var(--text)">Mon–Fri · 8AM–5PM</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px">Operating Hours</div>
+      </div>
+      <div style="background:#EEF3FD;border:1px solid #C0D4F8;border-radius:14px;padding:20px;text-align:center">
+        <div style="font-size:32px;margin-bottom:8px">🤖</div>
+        <div style="font-weight:700;font-size:13px;color:var(--text)">AI ID Verification</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px">Instant discount detection</div>
+      </div>
+      <div style="background:#FDECEA;border:1px solid #F5C6C2;border-radius:14px;padding:20px;text-align:center">
+        <div style="font-size:32px;margin-bottom:8px">⭐</div>
+        <div style="font-weight:700;font-size:13px;color:var(--text)">Loyalty Rewards</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px">Earn points every rental</div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- FOOTER -->
-<footer id="section-about">
+<footer style="background:#1C1916;color:#8A8078;padding:40px 80px;text-align:center">
   <p class="footer-brand">Kinetic<span>Borrow</span></p>
-  <p class="footer-sub">Your trusted sports equipment rental platform</p>
+  <p class="footer-sub">Your trusted sports equipment rental platform at University of Caloocan City</p>
   <div class="footer-links">
-    <span class="footer-link">About Us</span>
+    <span class="footer-link" onclick="scrollToAbout()">About Us</span>
     <span class="footer-link">Contact</span>
     <span class="footer-link">Privacy Policy</span>
     <span class="footer-link">Terms of Service</span>
     <span class="footer-link">FAQ</span>
   </div>
-  <p class="footer-copy">© <?= date('Y') ?> KineticBorrow · University of Caloocan City · Computer Studies Department</p>
+  <p style="font-size:12px;color:#555;margin-bottom:4px">Made with ❤️ by Agarano · Marianito · Napilot · Reyes · Tejada</p>
+  <p class="footer-copy">© <?= date('Y') ?> KineticBorrow · BS Information Systems</p>
 </footer>
 
 <!-- MODAL -->

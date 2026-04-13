@@ -5,6 +5,7 @@
 require_once 'includes/auth.php';
 require_once 'includes/db.php';
 require_once 'includes/google_oauth.php';
+require_once 'includes/mailer.php';
 
 // If already logged in, go to dashboard
 if (isLoggedIn()) {
@@ -66,6 +67,23 @@ if ($existing) {
     // Refresh user from DB
     $user = $conn->query("SELECT * FROM users WHERE id={$existing['id']} LIMIT 1")->fetch_assoc();
 
+    if ($user['email_verified']) {
+        // Already verified — log straight in
+        $_SESSION['user_id'] = $user['id'];
+        $_SESSION['user']    = $user;
+        header('Location: dashboard.php');
+        exit();
+    } else {
+        // Not yet verified — send code
+        $code = generateAndSaveCode($conn, $user['id']);
+        sendVerificationCode($user['email'], $user['first_name'], $code);
+        $_SESSION['verify_user_id'] = $user['id'];
+        $_SESSION['verify_email']   = $user['email'];
+        $_SESSION['verify_name']    = $user['first_name'];
+        header('Location: email_verify.php');
+        exit();
+    }
+// ✅ FIX: New user registration is now correctly in the `else` branch of `if ($existing)`
 } else {
     // New user — register them automatically
     // Generate a random unusable password (they'll use Google to log in)
@@ -79,11 +97,13 @@ if ($existing) {
     $new_id = $conn->insert_id;
 
     $user = $conn->query("SELECT * FROM users WHERE id=$new_id LIMIT 1")->fetch_assoc();
+
+    // New Google users — send verification code
+    $code = generateAndSaveCode($conn, $new_id);
+    sendVerificationCode($email, $fname, $code);
+    $_SESSION['verify_user_id'] = $new_id;
+    $_SESSION['verify_email']   = $email;
+    $_SESSION['verify_name']    = $fname;
+    header('Location: email_verify.php');
+    exit();
 }
-
-// Log them in
-$_SESSION['user_id'] = $user['id'];
-$_SESSION['user']    = $user;
-
-header('Location: dashboard.php');
-exit();

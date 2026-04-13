@@ -108,7 +108,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <label class="input-label">Email Address</label>
         <div class="input-wrap">
           <span class="input-icon">✉️</span>
-          <input class="form-input" type="email" name="email" placeholder="admin@kineticborrow.com" value="<?= htmlspecialchars($_POST['email'] ?? '') ?>" required/>
+          <input class="form-input" type="email" name="email" placeholder="you@gmail.com" value="<?= htmlspecialchars($_POST['email'] ?? '') ?>" required/>
         </div>
       </div>
       <div class="input-group">
